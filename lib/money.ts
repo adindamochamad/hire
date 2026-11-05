@@ -8,15 +8,23 @@ export function asMoney(value: unknown): string | null {
   return null;
 }
 
+function toCents(value: string): number | null {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return null;
+  return Math.round(amount * 100);
+}
+
 export function amountsAddUp(
   clientAmount: string,
   mayaAmount: string,
   studioAmount: string,
 ): boolean {
-  const client = Number(clientAmount);
-  const maya = Number(mayaAmount);
-  const studio = Number(studioAmount);
-  return client === 1200 && maya === 800 && studio === 400 && client === maya + studio;
+  const client = toCents(clientAmount);
+  const maya = toCents(mayaAmount);
+  const studio = toCents(studioAmount);
+  if (client === null || maya === null || studio === null) return false;
+  if (client <= 0 || maya < 0 || studio < 0) return false;
+  return client === maya + studio;
 }
 
 export function formatUsd(value: string | number): string {

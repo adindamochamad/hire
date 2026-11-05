@@ -13,7 +13,7 @@ import {
 import { amountsAddUp, formatUsd, splitCopy } from "@/lib/money";
 import { BACKUP_THREAD, DEMO_THREAD, draftMessages, type ThreadMessage } from "@/lib/thread";
 
-type ScriptId = "main" | "backup";
+type ScriptId = "main" | "backup" | "blank";
 
 type Props = {
   initialJob: JobPayload;
@@ -52,8 +52,10 @@ function formatWhen(value: string | null): string {
 export function JobPortal({ initialJob, initialEvents }: Props) {
   const [job, setJob] = useState(initialJob);
   const [events, setEvents] = useState(initialEvents);
-  const [script, setScript] = useState<ScriptId>("main");
-  const [thread, setThread] = useState<ThreadMessage[]>(DEMO_THREAD);
+  const [script, setScript] = useState<ScriptId>(initialJob.work_summary ? "main" : "blank");
+  const [thread, setThread] = useState<ThreadMessage[]>(
+    initialJob.work_summary ? DEMO_THREAD : [],
+  );
   const [summary, setSummary] = useState(initialJob.work_summary ?? "");
   const [clientAmount, setClientAmount] = useState(initialJob.client_amount);
   const [mayaAmount, setMayaAmount] = useState(initialJob.maya_amount);
@@ -432,21 +434,25 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
               </div>
             </div>
             <div className="thread">
-              {thread.map((message) => (
-                <article className="message" key={message.id}>
-                  <div className={`avatar ${message.party}`} aria-hidden>
-                    {message.name.slice(0, 1)}
-                  </div>
-                  <div>
-                    <header>
-                      <strong>{message.name}</strong>
-                    </header>
-                    <p className={message.party === "system" ? "system-line" : undefined}>
-                      {message.body}
-                    </p>
-                  </div>
-                </article>
-              ))}
+              {thread.length === 0 ? (
+                <p className="empty">No notes yet. Add a free-form note, or load an example.</p>
+              ) : (
+                thread.map((message) => (
+                  <article className="message" key={message.id}>
+                    <div className={`avatar ${message.party}`} aria-hidden>
+                      {message.name.slice(0, 1)}
+                    </div>
+                    <div>
+                      <header>
+                        <strong>{message.name}</strong>
+                      </header>
+                      <p className={message.party === "system" ? "system-line" : undefined}>
+                        {message.body}
+                      </p>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
             {locked ? null : (
               <>

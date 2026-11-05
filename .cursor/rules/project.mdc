@@ -7,7 +7,7 @@ alwaysApply: true
 
 Satu aplikasi Next.js (TypeScript) + Postgres. Diskusi bahasa Indonesia. Teks submission bahasa Inggris.
 
-Satu job tetap: klien $1.200, Maya $800, studio $400. Order memakai angka yang sudah tersimpan, bukan angka baru dari model.
+Seed $1.200 / $800 / $400. Order memakai angka yang sudah tersimpan, bukan angka baru dari model. Server menolak draf jika harga klien ≠ bagian Maya + sisa studio.
 
 ## Di luar scope
 
