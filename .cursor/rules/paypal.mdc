@@ -1,0 +1,25 @@
+---
+description: PayPal sandbox only, verified webhooks, payout after capture
+alwaysApply: true
+---
+
+# PayPal
+
+Sandbox saja. Client ID dan Secret hanya di `.env`, dengan `.env.example`. Jangan commit kredensial.
+
+Jangan menebak nama endpoint. Baca dokumen resmi atau `paypal/AI-Toolkit` sebelum menulis panggilan.
+
+## Alur
+
+1. `POST /v2/checkout/orders` sebesar harga klien yang tersimpan, intent capture.
+2. Klien approve di layar PayPal, lalu `POST /v2/checkout/orders/{id}/capture`.
+3. Simpan `PAYMENT.CAPTURE.COMPLETED` hanya setelah tanda tangan webhook diverifikasi.
+4. Setelah status itu tersimpan, `POST /v1/payments/payouts` sebesar $800 ke email sandbox Maya.
+5. Kirim `PayPal-Request-Id` dan `sender_batch_id` dari id job.
+6. Tutup bagian Maya dengan `PAYMENT.PAYOUTS-ITEM.SUCCEEDED`.
+
+Create-order membaca database. Server menolak draf jika $1.200 ≠ $800 + $400.
+
+Kalau payout hari pertama gagal, berhenti. Jangan menulis “Maya telah dibayar” tanpa id payout.
+
+`platform_fees` tidak dipakai. Di sandbox fee itu tidak muncul di saldo.

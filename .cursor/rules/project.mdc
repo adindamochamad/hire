@@ -1,0 +1,26 @@
+---
+description: Hire scope, stack, and the one job that may be built
+alwaysApply: true
+---
+
+# Hire
+
+Satu aplikasi Next.js (TypeScript) + Postgres. Diskusi bahasa Indonesia. Teks submission bahasa Inggris.
+
+Satu job tetap: klien $1.200, Maya $800, studio $400. Order memakai angka yang sudah tersimpan, bukan angka baru dari model.
+
+## Di luar scope
+
+Jangan tambahkan kolom agent pembanding, invoice, sengketa, subscription, `platform_fees`, banyak rekan, banyak job, multi-currency, akun live, atau aplikasi mobile.
+
+## Uang
+
+Status sudah dibayar hanya ada kalau id PayPal sungguhan tersimpan.
+
+```ts
+// Jangan
+job.mayaPaid = true;
+
+// Lakukan
+job.payoutItemId = paypalPayoutItemId;
+```

@@ -1,0 +1,11 @@
+{
+  "jobId": "hire-job-4",
+  "script": "backup",
+  "draft": {
+    "workSummary": "Homepage for the studio, two revision passes",
+    "clientAmount": "1200.00",
+    "mayaAmount": "800.00",
+    "studioAmount": "400.00"
+  },
+  "notes": "Different wording from the main activity script. Server accepted $1,200 = $800 + $400. No new payment flow."
+}

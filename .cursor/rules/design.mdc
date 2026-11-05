@@ -1,0 +1,20 @@
+---
+description: One job page after PayPal works, without generic AI styling
+alwaysApply: true
+---
+
+# Design
+
+Jangan bangun halaman job sebelum capture $1.200 dan payout $800 sungguhan lulus.
+
+Satu halaman job, dari obrolan sampai sisa $400. Bukan landing konsep.
+
+## Saat UI mulai
+
+- Maksimal dua keluarga font. Body minimal 16px. Bukan Inter, Poppins, atau Roboto untuk semuanya.
+- Palet custom. Bukan ungu `#8B5CF6`, gradient ungu-pink, atau gradient text.
+- Kartu solid. Tanpa glassmorphism di setiap kartu.
+- Tanpa testimonial palsu, feature grid 3×2, dan frasa “seamless”, “unlock”, “revolutionize”.
+- Copy menyebut $1.200, Maya, $800, dan $400.
+
+Palet dan font belum dipilih. Jangan mengunci keduanya di aturan ini.

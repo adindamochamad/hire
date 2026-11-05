@@ -1,0 +1,13 @@
+{
+  "jobId": "hire-job-2",
+  "clientAmount": "1200.00",
+  "mayaAmount": "800.00",
+  "studioAmount": "400.00",
+  "orderId": "5CF29381D67410056",
+  "captureId": "8CB749217S759632M",
+  "payoutBatchId": "8SX3GMSJP9VLQ",
+  "payoutItemId": "5Q278FBTZ3SRE",
+  "captureEventId": "WH-3L091541F3448922B-94X099993E4797518",
+  "payoutEventId": "WH-0Y5578252U3454325-8T442406SW4766643",
+  "notes": "Payout ran only after PAYMENT.CAPTURE.COMPLETED was verified and stored. Unsigned POSTs returned 400."
+}

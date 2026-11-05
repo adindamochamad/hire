@@ -1,0 +1,15 @@
+{
+  "jobId": "hire-job-1",
+  "clientAmount": "1200.00",
+  "mayaAmount": "800.00",
+  "studioAmount": "400.00",
+  "orderId": "38C36930XF251562W",
+  "orderStatus": "COMPLETED",
+  "approveUrl": "https://www.sandbox.paypal.com/checkoutnow?token=38C36930XF251562W",
+  "captureId": "8G270661F7168261A",
+  "payoutBatchId": "2RSLSLCF5XW58",
+  "payoutItemId": "896RRTNPZVAPC",
+  "payoutItemStatus": "SUCCESS",
+  "captureStatus": "COMPLETED",
+  "payoutBatchStatus": "SUCCESS"
+}

@@ -1,0 +1,13 @@
+{
+  "jobId": "hire-job-3",
+  "clientAmount": "1200.00",
+  "mayaAmount": "800.00",
+  "studioAmount": "400.00",
+  "orderId": "55W567392A068483P",
+  "captureId": "7F025743PF0972529",
+  "payoutBatchId": "HBZ2DBDDJ3G2S",
+  "payoutItemId": "92YGAP88MPDRG",
+  "captureEventId": "WH-4H0763312G997512W-4LU48056G20289405",
+  "payoutEventId": "WH-0C075008SB425264L-7VU23387FB970962C",
+  "notes": "Ran from the job page APIs. Capture webhook stored first; payout $800 started only after that. PAYMENT.PAYOUTS-ITEM.SUCCEEDED closed Maya's share. hire-job-1 was not reused because its PayPal-Request-Id and sender_batch_id were already spent on 4 Nov."
+}
