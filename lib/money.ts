@@ -25,3 +25,11 @@ export function formatUsd(value: string | number): string {
     currency: "USD",
   }).format(Number(value));
 }
+
+export function splitCopy(
+  clientAmount: string | number,
+  mayaAmount: string | number,
+  studioAmount: string | number,
+): string {
+  return `Client pays ${formatUsd(clientAmount)}. Maya receives ${formatUsd(mayaAmount)}. Studio keeps ${formatUsd(studioAmount)}.`;
+}

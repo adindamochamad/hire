@@ -104,7 +104,7 @@ function publicOrigin(): string {
   return "http://127.0.0.1:3000";
 }
 
-export async function createClientOrder(jobId: string, amount: string) {
+export async function createClientOrder(jobId: string, amount: string, summary: string | null) {
   const jobUrl = `${publicOrigin()}/jobs/${jobId}`;
   return paypal("/v2/checkout/orders", {
     method: "POST",
@@ -115,7 +115,7 @@ export async function createClientOrder(jobId: string, amount: string) {
         {
           reference_id: jobId,
           custom_id: jobId,
-          description: "Landing page, two rounds of revision",
+          description: summary?.slice(0, 127) || jobId,
           amount: { currency_code: "USD", value: amount },
         },
       ],
@@ -140,22 +140,27 @@ export async function captureOrder(orderId: string, jobId: string) {
   });
 }
 
-export async function payoutMaya(jobId: string, amount: string, email: string) {
+export async function payoutMaya(
+  jobId: string,
+  mayaAmount: string,
+  clientAmount: string,
+  email: string,
+) {
   return paypal("/v1/payments/payouts", {
     method: "POST",
     requestId: jobId,
     body: {
       sender_batch_header: {
         sender_batch_id: jobId,
-        email_subject: "Maya share for the landing page",
-        email_message: "Client paid $1,200. Your share is $800.",
+        email_subject: `Maya share for ${jobId}`,
+        email_message: `Client paid ${clientAmount}. Your share is ${mayaAmount}.`,
       },
       items: [
         {
           recipient_type: "EMAIL",
-          amount: { value: amount, currency: "USD" },
+          amount: { value: mayaAmount, currency: "USD" },
           receiver: email,
-          note: "Maya share $800 of client $1,200",
+          note: `Maya share ${mayaAmount} of client ${clientAmount}`,
           sender_item_id: `${jobId}-maya`,
         },
       ],

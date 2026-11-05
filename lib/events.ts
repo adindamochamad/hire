@@ -143,7 +143,7 @@ async function onCaptureCompleted(job: JobRow, resource: Record<string, unknown>
 
   const email = process.env.PAYPAL_MAYA_EMAIL;
   if (!email) throw new Error("PAYPAL_MAYA_EMAIL missing");
-  const paid = await payoutMaya(fresh.id, fresh.maya_amount, email);
+  const paid = await payoutMaya(fresh.id, fresh.maya_amount, fresh.client_amount, email);
   if (!paid.ok) {
     throw new Error(`payout failed ${paid.status} ${paid.debugId} ${paid.raw}`);
   }

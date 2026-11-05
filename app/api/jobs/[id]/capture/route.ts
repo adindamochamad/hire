@@ -1,4 +1,5 @@
 import { getJob, moneyAddsUp, pool } from "@/lib/db";
+import { debugLog } from "@/lib/debug-log";
 import { asRecord, asString, captureOrder } from "@/lib/paypal";
 
 export async function POST(
@@ -15,6 +16,21 @@ export async function POST(
   }
 
   const captured = await captureOrder(job.paypal_order_id, job.id);
+  // #region agent log
+  debugLog(
+    "app/api/jobs/[id]/capture/route.ts",
+    "capture result",
+    {
+      jobId: job.id,
+      requestId: `${job.id}-capture`,
+      ok: captured.ok,
+      status: captured.status,
+      paypalDebugId: captured.debugId,
+      issue: typeof captured.json.name === "string" ? captured.json.name : null,
+    },
+    "B",
+  );
+  // #endregion
   if (!captured.ok) {
     return Response.json(
       { error: "capture failed", debugId: captured.debugId, body: captured.json },

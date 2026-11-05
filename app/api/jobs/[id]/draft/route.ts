@@ -25,7 +25,7 @@ async function draftFromModel(messages: unknown): Promise<Draft> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
   const prompt =
-    "Read the studio chat. Return JSON only with workSummary, clientAmount, mayaAmount, studioAmount. Amounts are USD strings with two decimals. The client price must equal Maya's share plus the studio remainder.";
+    "Read the studio chat, including free-form notes, negotiation, and ambiguous or conflicting figures. Return JSON only with workSummary, clientAmount, mayaAmount, studioAmount. Amounts are USD strings with two decimals. The client price must equal Maya's share plus the studio remainder. Do not invent a PayPal payment. The server will reject the draft unless those three amounts add up.";
 
   if (anthropicKey) {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -117,7 +117,7 @@ export async function POST(
   };
   if (!moneyAddsUp(candidate)) {
     return Response.json(
-      { error: "draft rejected: $1,200 must equal $800 + $400", draft },
+      { error: "draft rejected: client amount must equal Maya share plus studio remainder", draft },
       { status: 422 },
     );
   }

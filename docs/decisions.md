@@ -128,3 +128,10 @@
 - `return_url` / `cancel_url` kembali ke halaman job, bukan example.com.
 - Webhook capture hanya mencocokkan `paypal_order_id` tersimpan dan jumlah $1,200 USD sebelum payout $800. Item payout hanya ditutup jika resource-nya $800.
 - Id order / capture / payout tampil di rail, bukan di dalam `<details>`. Tautan approve tetap di halaman kalau popup diblokir.
+
+## 2026-11-05 — New Job + keep-alive
+
+- `POST /api/jobs` membuat `hire-{uuid}` dengan pecahan tersimpan $1.200 / $800 / $400, tanpa persetujuan. Order memakai id itu sebagai kunci PayPal.
+- Catatan boleh chat bebas. Draf model tetap ditolak server jika pecahan tidak jumlah.
+- Copy PayPal dan timeline membaca field job. Orders v2 / Payouts v1 tetap REST dari baris database, bukan Agent Toolkit `create_order`.
+- `GET /api/health` plus cron 10 menit supaya instance free tidak tidur di depan juri.

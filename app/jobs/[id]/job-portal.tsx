@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { debugLog } from "@/lib/debug-log";
 import {
   agreementLocked,
   hasCaptureEvent,
@@ -10,7 +11,7 @@ import {
   type JobPayload,
   type PaypalEventPayload,
 } from "@/lib/job";
-import { amountsAddUp, formatUsd } from "@/lib/money";
+import { amountsAddUp, formatUsd, splitCopy } from "@/lib/money";
 import { BACKUP_THREAD, DEMO_THREAD, draftMessages, type ThreadMessage } from "@/lib/thread";
 
 type ScriptId = "main" | "backup";
@@ -28,7 +29,8 @@ type Busy =
   | "client"
   | "order"
   | "capture"
-  | "refresh";
+  | "refresh"
+  | "create";
 
 function errorMessage(payload: unknown, fallback: string): string {
   if (payload && typeof payload === "object" && "error" in payload) {
@@ -60,6 +62,8 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const [busy, setBusy] = useState<Busy>("idle");
   const [error, setError] = useState<string | null>(null);
   const [approveUrl, setApproveUrl] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [noteParty, setNoteParty] = useState<ThreadMessage["party"]>("studio");
 
   const status = jobStatus(job, events);
   const locked = agreementLocked(job);
@@ -67,6 +71,24 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const captureDone = hasCaptureEvent(events);
   const payoutDone = hasPayoutEvent(events) && Boolean(job.paypal_payout_item_id);
   const bothAgreed = Boolean(job.client_agreed_at && job.maya_agreed_at);
+
+  useEffect(() => {
+    // #region agent log
+    debugLog(
+      "app/jobs/[id]/job-portal.tsx:mount",
+      "job portal controls",
+      {
+        jobId: job.id,
+        status,
+        bothAgreeButtonsOnSamePage: true,
+        newJobControl: true,
+        freeChatInput: true,
+        payoutItemSet: Boolean(job.paypal_payout_item_id),
+      },
+      "D",
+    );
+    // #endregion
+  }, [job.id, job.paypal_payout_item_id, status]);
 
   function syncForm(next: JobPayload) {
     setSummary(next.work_summary ?? "");
@@ -85,6 +107,36 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
     setEvents(payload.events ?? []);
     syncForm(payload.job);
     return { job: payload.job, events: payload.events ?? [] };
+  }
+
+  async function createJob() {
+    await run("create", async () => {
+      const res = await fetch("/api/jobs", { method: "POST" });
+      const payload = await res.json();
+      if (!res.ok || !payload.job?.id) throw new Error(errorMessage(payload, "could not create job"));
+      window.location.href = `/jobs/${payload.job.id as string}`;
+    });
+  }
+
+  function addNote() {
+    const body = note.trim();
+    if (!body) return;
+    const names: Record<ThreadMessage["party"], string> = {
+      studio: "Studio",
+      maya: "Maya",
+      client: "Client",
+      system: "Hire",
+    };
+    setThread((current) => [
+      ...current,
+      {
+        id: `n-${Date.now()}`,
+        party: noteParty,
+        name: names[noteParty],
+        body,
+      },
+    ]);
+    setNote("");
   }
 
   async function run(kind: Busy, work: () => Promise<void>) {
@@ -216,7 +268,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
       },
       {
         key: "capture",
-        title: "Client paid $1,200",
+        title: `Client paid ${formatUsd(job.client_amount)}`,
         copy: captureDone
           ? `PAYMENT.CAPTURE.COMPLETED · ${job.paypal_capture_id ?? "stored"}`
           : "Payout starts after client payment is confirmed.",
@@ -224,9 +276,9 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
       },
       {
         key: "payout",
-        title: "Maya paid $800",
+        title: `Maya paid ${formatUsd(job.maya_amount)}`,
         copy: payoutDone
-          ? `PAYMENT.PAYOUTS-ITEM.SUCCEEDED · ${job.paypal_payout_item_id ?? "stored"}. Studio keeps $400.`
+          ? `PAYMENT.PAYOUTS-ITEM.SUCCEEDED · ${job.paypal_payout_item_id ?? "stored"}. Studio keeps ${formatUsd(job.studio_amount)}.`
           : "Maya is paid only after the capture webhook.",
         state: payoutDone ? "done" : captureDone ? "waiting" : "pending",
       },
@@ -240,7 +292,17 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
         <a className="wordmark" href="/">
           Hire
         </a>
-        <span className={`pill ${status}`}>{statusLabel(status)}</span>
+        <div className="topbar-actions">
+          <button
+            className="ghost"
+            disabled={busy !== "idle"}
+            onClick={() => void createJob()}
+            type="button"
+          >
+            {busy === "create" ? "Opening…" : "New Job"}
+          </button>
+          <span className={`pill ${status}`}>{statusLabel(status)}</span>
+        </div>
       </header>
 
       <main className="shell">
@@ -258,7 +320,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
               />
             </label>
           )}
-          <p className="lede">Client pays $1,200. Maya receives $800. Studio keeps $400.</p>
+          <p className="lede">{splitCopy(job.client_amount, job.maya_amount, job.studio_amount)}</p>
           {error ? <p className="banner">{error}</p> : null}
           {locked ? (
             <dl className="sheet-money">
@@ -307,7 +369,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                 </label>
               </div>
               {!amountsAddUp(clientAmount, mayaAmount, studioAmount) ? (
-                <p className="banner">$1,200 must equal $800 + $400.</p>
+                <p className="banner">Client amount must equal Maya share plus studio remainder.</p>
               ) : null}
               <div className="actions">
                 <button
@@ -321,6 +383,10 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
               </div>
             </>
           )}
+          <p className="lede">
+            This studio view can record both agreements. Press New Job so the next reviewer gets a
+            fresh PayPal request id.
+          </p>
           <div className="party-row">
             <div>
               <strong>Maya</strong>
@@ -361,7 +427,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
           <section className="notes">
             <div className="notes-head">
               <h2>Notes</h2>
-              <div className="script-switch" role="group" aria-label="Activity script">
+              <div className="script-switch" role="group" aria-label="Starter notes">
                 <button
                   className={script === "main" ? "active" : undefined}
                   onClick={() => {
@@ -370,7 +436,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                   }}
                   type="button"
                 >
-                  Main script
+                  Example
                 </button>
                 <button
                   className={script === "backup" ? "active" : undefined}
@@ -380,7 +446,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                   }}
                   type="button"
                 >
-                  Backup script
+                  Ambiguous example
                 </button>
               </div>
             </div>
@@ -402,16 +468,47 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
               ))}
             </div>
             {locked ? null : (
-              <div className="actions">
-                <button
-                  className="secondary"
-                  disabled={busy !== "idle"}
-                  onClick={() => void draftFromActivity()}
-                  type="button"
+              <>
+                <form
+                  className="composer"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    addNote();
+                  }}
                 >
-                  {busy === "draft" ? "Drafting…" : "Draft agreement from notes"}
-                </button>
-              </div>
+                  <label>
+                    <span className="sr-only">Who is writing</span>
+                    <select
+                      value={noteParty}
+                      onChange={(event) =>
+                        setNoteParty(event.target.value as ThreadMessage["party"])
+                      }
+                    >
+                      <option value="studio">Studio</option>
+                      <option value="maya">Maya</option>
+                      <option value="client">Client</option>
+                    </select>
+                  </label>
+                  <input
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    placeholder="Add a free-form note, including messy numbers"
+                  />
+                  <button className="secondary" type="submit">
+                    Add
+                  </button>
+                </form>
+                <div className="actions">
+                  <button
+                    className="secondary"
+                    disabled={busy !== "idle"}
+                    onClick={() => void draftFromActivity()}
+                    type="button"
+                  >
+                    {busy === "draft" ? "Drafting…" : "Draft agreement from notes"}
+                  </button>
+                </div>
+              </>
             )}
           </section>
         </article>
@@ -455,12 +552,16 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
           <section className="card">
             <h2>PayPal</h2>
             <p className="lede">
-              The order uses the stored $1,200. Maya is paid $800 only after capture is confirmed.
+              The order uses the stored {formatUsd(job.client_amount)}. Maya is paid{" "}
+              {formatUsd(job.maya_amount)} only after capture is confirmed. The model does not pick the
+              PayPal amount.
             </p>
             {captureDone ? (
               <p className="settled">
-                Client paid $1,200.
-                {payoutDone ? " Maya received $800. Studio keeps $400." : " Waiting on Maya's $800."}
+                Client paid {formatUsd(job.client_amount)}.
+                {payoutDone
+                  ? ` Maya received ${formatUsd(job.maya_amount)}. Studio keeps ${formatUsd(job.studio_amount)}.`
+                  : ` Waiting on Maya's ${formatUsd(job.maya_amount)}.`}
               </p>
             ) : (
               <div className="actions pay-actions">
@@ -470,11 +571,11 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                   onClick={() => void createOrder()}
                   type="button"
                 >
-                  {busy === "order" ? "Opening PayPal…" : "Pay $1,200 on PayPal"}
+                  {busy === "order" ? "Opening PayPal…" : `Pay ${formatUsd(job.client_amount)} on PayPal`}
                 </button>
                 {approveUrl ? (
                   <a className="paypal-link" href={approveUrl} rel="noreferrer" target="_blank">
-                    Open PayPal to approve $1,200
+                    Open PayPal to approve {formatUsd(job.client_amount)}
                   </a>
                 ) : null}
                 {job.paypal_order_id ? (

@@ -1,4 +1,5 @@
 import { getJob, pool } from "@/lib/db";
+import { debugLog } from "@/lib/debug-log";
 import { serializeJob } from "@/lib/job";
 
 export async function POST(
@@ -15,6 +16,20 @@ export async function POST(
     return Response.json({ error: "party must be client or maya" }, { status: 400 });
   }
   const column = body.party === "client" ? "client_agreed_at" : "maya_agreed_at";
+  // #region agent log
+  debugLog(
+    "app/api/jobs/[id]/agree/route.ts",
+    "agree without auth",
+    {
+      jobId: id,
+      party: body.party,
+      alreadyClient: Boolean(job.client_agreed_at),
+      alreadyMaya: Boolean(job.maya_agreed_at),
+      hasAuthHeader: request.headers.has("authorization"),
+    },
+    "C",
+  );
+  // #endregion
   const saved = await pool.query(
     `update jobs set ${column} = coalesce(${column}, now()) where id = $1 returning *`,
     [id],

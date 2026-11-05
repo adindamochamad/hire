@@ -61,7 +61,7 @@ export async function PATCH(
   }
   if (!amountsAddUp(clientAmount, mayaAmount, studioAmount)) {
     return Response.json(
-      { error: "draft rejected: $1,200 must equal $800 + $400" },
+      { error: "draft rejected: client amount must equal Maya share plus studio remainder" },
       { status: 422 },
     );
   }
