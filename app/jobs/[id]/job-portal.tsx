@@ -73,6 +73,8 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const bothAgreed = Boolean(job.client_agreed_at && job.maya_agreed_at);
 
   useEffect(() => {
+    const composer = document.querySelector(".composer");
+    const box = composer?.getBoundingClientRect();
     // #region agent log
     debugLog(
       "app/jobs/[id]/job-portal.tsx:mount",
@@ -84,6 +86,9 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
         newJobControl: true,
         freeChatInput: true,
         payoutItemSet: Boolean(job.paypal_payout_item_id),
+        composerWidth: box ? Math.round(box.width) : null,
+        composerHeight: box ? Math.round(box.height) : null,
+        partySwitch: Boolean(document.querySelector(".party-switch")),
       },
       "D",
     );
@@ -476,27 +481,28 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                     addNote();
                   }}
                 >
-                  <label>
-                    <span className="sr-only">Who is writing</span>
-                    <select
-                      value={noteParty}
-                      onChange={(event) =>
-                        setNoteParty(event.target.value as ThreadMessage["party"])
-                      }
-                    >
-                      <option value="studio">Studio</option>
-                      <option value="maya">Maya</option>
-                      <option value="client">Client</option>
-                    </select>
-                  </label>
-                  <input
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                    placeholder="Add a free-form note, including messy numbers"
-                  />
-                  <button className="secondary" type="submit">
-                    Add
-                  </button>
+                  <div className="party-switch" role="group" aria-label="Who is writing">
+                    {(["studio", "maya", "client"] as const).map((party) => (
+                      <button
+                        key={party}
+                        className={noteParty === party ? "active" : undefined}
+                        onClick={() => setNoteParty(party)}
+                        type="button"
+                      >
+                        {party === "studio" ? "Studio" : party === "maya" ? "Maya" : "Client"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="composer-row">
+                    <input
+                      value={note}
+                      onChange={(event) => setNote(event.target.value)}
+                      placeholder="Add a free-form note, including messy numbers"
+                    />
+                    <button className="secondary" type="submit">
+                      Add
+                    </button>
+                  </div>
                 </form>
                 <div className="actions">
                   <button
