@@ -1,4 +1,4 @@
-import { Pool, type QueryResult, type QueryResultRow } from "pg";
+import { Pool } from "pg";
 import { amountsAddUp } from "./money";
 
 const globalForDb = globalThis as typeof globalThis & { hirePool?: Pool };
@@ -22,14 +22,13 @@ export function getPool(): Pool {
   return globalForDb.hirePool;
 }
 
-export const pool = {
-  query<T extends QueryResultRow = QueryResultRow>(
-    text: string,
-    values?: unknown[],
-  ): Promise<QueryResult<T>> {
-    return getPool().query<T>(text, values);
+export const pool = new Proxy({} as Pool, {
+  get(_target, prop) {
+    const real = getPool();
+    const value = Reflect.get(real, prop, real);
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(real) : value;
   },
-};
+});
 
 export type JobRow = {
   id: string;
