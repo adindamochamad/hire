@@ -1,4 +1,5 @@
 import { getJob, moneyAddsUp, pool, type JobRow } from "./db";
+import { asMoney } from "./money";
 import { asRecord, asString, payoutMaya } from "./paypal";
 
 type PaypalEvent = {
@@ -37,18 +38,26 @@ export function payoutBatchId(resource: Record<string, unknown> | null): string 
   return asString(resource?.payout_batch_id);
 }
 
+function resourceAmount(
+  resource: Record<string, unknown> | null,
+  paths: string[][],
+): { value: string | null; currency: string | null } {
+  for (const path of paths) {
+    const value = nestedString(resource, [...path, "value"]);
+    const currency =
+      nestedString(resource, [...path, "currency_code"]) ??
+      nestedString(resource, [...path, "currency"]);
+    if (value) return { value: asMoney(value), currency };
+  }
+  return { value: null, currency: null };
+}
+
 async function findJobForCapture(resource: Record<string, unknown> | null): Promise<JobRow | null> {
   const orderId = captureOrderId(resource);
-  const id = captureId(resource);
-  const customId = asString(resource?.custom_id) ?? asString(resource?.invoice_id);
+  if (!orderId) return null;
   const result = await pool.query<JobRow>(
-    `select * from jobs
-     where paypal_order_id = $1
-        or paypal_capture_id = $2
-        or id = $3
-     order by created_at desc
-     limit 1`,
-    [orderId, id, customId],
+    "select * from jobs where paypal_order_id = $1 limit 1",
+    [orderId],
   );
   return result.rows[0] ?? null;
 }
@@ -114,6 +123,11 @@ export async function storeVerifiedEvent(rawBody: string): Promise<{
 
 async function onCaptureCompleted(job: JobRow, resource: Record<string, unknown> | null) {
   if (!moneyAddsUp(job)) return;
+  const capturedAmount = resourceAmount(resource, [
+    ["amount"],
+    ["seller_receivable_breakdown", "gross_amount"],
+  ]);
+  if (capturedAmount.value !== asMoney(job.client_amount) || capturedAmount.currency !== "USD") return;
   const id = captureId(resource);
   const orderId = captureOrderId(resource);
   await pool.query(
@@ -141,6 +155,8 @@ async function onCaptureCompleted(job: JobRow, resource: Record<string, unknown>
 }
 
 async function onPayoutSucceeded(job: JobRow, resource: Record<string, unknown> | null) {
+  const paid = resourceAmount(resource, [["payout_item", "amount"], ["amount"]]);
+  if (paid.value !== asMoney(job.maya_amount) || (paid.currency && paid.currency !== "USD")) return;
   await pool.query(
     `update jobs
      set paypal_payout_item_id = coalesce(paypal_payout_item_id, $2),

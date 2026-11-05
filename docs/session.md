@@ -6,7 +6,7 @@ Sesi baru di folder `hire/`. Jangan andalkan chat sebelumnya. README akar berbah
 
 - Stage **2**. Capture, payout, webhook, draf model, dan halaman job **lulus** lokal.
 - Job yang membuktikan alur UI + uang lokal: **`hire-job-3`** (Complete).
-- Deploy memakai seed **`hire-job-1`**. `/` mengarah ke sana.
+- Deploy memakai seed **`hire-job-5`**. `/` mengarah ke sana. `hire-job-1` tidak diulang: kunci PayPal-nya sudah terpakai 4 Nov.
 - Deadline: **13 Nov 2026, 03:00 WIB**. Video dan teks Devpost dikunci **12 Nov 2026, 18:00 WIB**.
 
 ## Bukti uang (sandbox, lokal)

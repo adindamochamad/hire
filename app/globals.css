@@ -624,8 +624,22 @@ textarea {
 }
 
 .pay-actions .primary,
-.pay-actions .secondary {
+.pay-actions .secondary,
+.pay-actions .paypal-link {
   width: 100%;
+}
+
+.paypal-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--teal);
+  color: var(--teal);
+  font-weight: 650;
+  text-align: center;
+  text-decoration: none;
 }
 
 .empty {

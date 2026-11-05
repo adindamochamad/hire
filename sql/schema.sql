@@ -24,11 +24,19 @@ CREATE TABLE IF NOT EXISTS paypal_events (
 );
 
 INSERT INTO jobs (id, work_summary, client_amount, maya_amount, studio_amount)
-VALUES (
-  'hire-job-1',
-  'Landing page, two rounds of revision',
-  1200.00,
-  800.00,
-  400.00
-)
+VALUES
+  (
+    'hire-job-1',
+    'Landing page, two rounds of revision',
+    1200.00,
+    800.00,
+    400.00
+  ),
+  (
+    'hire-job-5',
+    'Landing page, two rounds of revision',
+    1200.00,
+    800.00,
+    400.00
+  )
 ON CONFLICT (id) DO NOTHING;

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function Home() {
-  redirect("/jobs/hire-job-1");
+  redirect("/jobs/hire-job-5");
 }

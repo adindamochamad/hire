@@ -6,7 +6,7 @@ One job. The client pays **$1,200**. Maya receives **$800**. The studio keeps **
 
 Built for the [PayPal AI Hackathon](https://paypal-ai-hackathon.devpost.com/).
 
-Live (Render): [https://hire-brjt.onrender.com](https://hire-brjt.onrender.com) — opens `hire-job-1`.
+Live (Render): [https://hire-brjt.onrender.com](https://hire-brjt.onrender.com) — opens `hire-job-5`.
 
 ## What it does
 
@@ -39,7 +39,7 @@ npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:3000/](http://127.0.0.1:3000/). The home route opens `hire-job-1`.
+Open [http://127.0.0.1:3000/](http://127.0.0.1:3000/). The home route opens `hire-job-5`.
 
 Required in `.env`: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MAYA_EMAIL`, `PAYPAL_WEBHOOK_ID`, `DATABASE_URL`, and `ANTHROPIC_API_KEY`. Never commit `.env`.
 
@@ -57,7 +57,7 @@ Put the printed `webhookId` in `PAYPAL_WEBHOOK_ID`.
 
 1. Set the `sync: false` env vars in the Render dashboard (PayPal sandbox + Anthropic). Do not paste them into git.
 2. Point the PayPal webhook at `https://<service>.onrender.com/api/webhooks/paypal` and save the new webhook id as `PAYPAL_WEBHOOK_ID`.
-3. Walk `hire-job-1` once on the live URL: draft, agree, pay $1,200, wait for Maya’s $800 payout.
+3. Walk `hire-job-5` once on the live URL: draft, agree, pay $1,200, wait for Maya’s $800 payout. `hire-job-1` already spent its PayPal request ids in the local sandbox tests.
 
 ## License
 

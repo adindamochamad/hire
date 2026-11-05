@@ -59,6 +59,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const [studioAmount, setStudioAmount] = useState(initialJob.studio_amount);
   const [busy, setBusy] = useState<Busy>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [approveUrl, setApproveUrl] = useState<string | null>(null);
 
   const status = jobStatus(job, events);
   const locked = agreementLocked(job);
@@ -166,8 +167,9 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
       const payload = await res.json();
       if (!res.ok) throw new Error(errorMessage(payload, "could not create PayPal order"));
       await refresh();
-      const approveUrl = typeof payload.approveUrl === "string" ? payload.approveUrl : null;
-      if (approveUrl) window.open(approveUrl, "_blank", "noopener,noreferrer");
+      const nextApproveUrl = typeof payload.approveUrl === "string" ? payload.approveUrl : null;
+      setApproveUrl(nextApproveUrl);
+      if (nextApproveUrl) window.open(nextApproveUrl, "_blank", "noopener,noreferrer");
     });
   }
 
@@ -216,7 +218,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
         key: "capture",
         title: "Client paid $1,200",
         copy: captureDone
-          ? "PAYMENT.CAPTURE.COMPLETED is stored."
+          ? `PAYMENT.CAPTURE.COMPLETED · ${job.paypal_capture_id ?? "stored"}`
           : "Payout starts after client payment is confirmed.",
         state: captureDone ? "done" : bothAgreed ? "waiting" : "pending",
       },
@@ -224,7 +226,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
         key: "payout",
         title: "Maya paid $800",
         copy: payoutDone
-          ? "PAYMENT.PAYOUTS-ITEM.SUCCEEDED is stored. Studio keeps $400."
+          ? `PAYMENT.PAYOUTS-ITEM.SUCCEEDED · ${job.paypal_payout_item_id ?? "stored"}. Studio keeps $400.`
           : "Maya is paid only after the capture webhook.",
         state: payoutDone ? "done" : captureDone ? "waiting" : "pending",
       },
@@ -470,6 +472,11 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                 >
                   {busy === "order" ? "Opening PayPal…" : "Pay $1,200 on PayPal"}
                 </button>
+                {approveUrl ? (
+                  <a className="paypal-link" href={approveUrl} rel="noreferrer" target="_blank">
+                    Open PayPal to approve $1,200
+                  </a>
+                ) : null}
                 {job.paypal_order_id ? (
                   <button
                     className="secondary"
@@ -499,34 +506,32 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
           </section>
 
           <section className="card">
-            <details className="proof">
-              <summary>Payment records</summary>
-              <dl className="records">
-                <div>
-                  <dt>Order</dt>
-                  <dd>{job.paypal_order_id ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt>Capture</dt>
-                  <dd>{job.paypal_capture_id ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt>Payout item</dt>
-                  <dd>{job.paypal_payout_item_id ?? "—"}</dd>
-                </div>
-              </dl>
-              <ul className="records events">
-                {events.length === 0 ? (
-                  <li>No verified PayPal events yet.</li>
-                ) : (
-                  events.map((event) => (
-                    <li key={event.id}>
-                      {event.event_type} · {event.resource_id ?? event.id}
-                    </li>
-                  ))
-                )}
-              </ul>
-            </details>
+            <h2>Payment records</h2>
+            <dl className="records">
+              <div>
+                <dt>Order</dt>
+                <dd>{job.paypal_order_id ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>Capture</dt>
+                <dd>{job.paypal_capture_id ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>Payout item</dt>
+                <dd>{job.paypal_payout_item_id ?? "—"}</dd>
+              </div>
+            </dl>
+            <ul className="records events">
+              {events.length === 0 ? (
+                <li>No verified PayPal events yet.</li>
+              ) : (
+                events.map((event) => (
+                  <li key={event.id}>
+                    {event.event_type} · {event.resource_id ?? event.id}
+                  </li>
+                ))
+              )}
+            </ul>
           </section>
         </aside>
       </main>

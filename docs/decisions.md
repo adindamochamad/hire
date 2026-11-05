@@ -121,3 +121,10 @@
 - Perjanjian yang sudah dikunci tampil sebagai lembar, bukan field mati. Tombol yang tidak bisa dipakai lagi disembunyikan.
 - Rail uang: angka lebih besar, sisa studio $400 di latar hangat, timeline punya garis. Alur tidak bertambah.
 - Halaman disusun ulang seperti brief Doquo: judul kerja di atas, catatan di bawah, pecahan uang tetap di kanan.
+
+## 2026-11-05 — Audit Grok + job live
+
+- `/` dan seed Render memakai `hire-job-5`. `hire-job-1` sampai `hire-job-4` sudah memakai `PayPal-Request-Id` / `sender_batch_id` di sandbox yang sama.
+- `return_url` / `cancel_url` kembali ke halaman job, bukan example.com.
+- Webhook capture hanya mencocokkan `paypal_order_id` tersimpan dan jumlah $1,200 USD sebelum payout $800. Item payout hanya ditutup jika resource-nya $800.
+- Id order / capture / payout tampil di rail, bukan di dalam `<details>`. Tautan approve tetap di halaman kalau popup diblokir.

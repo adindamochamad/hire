@@ -98,7 +98,14 @@ export async function verifyWebhookSignature(
   return result.ok && result.json.verification_status === "SUCCESS";
 }
 
+function publicOrigin(): string {
+  const fromEnv = process.env.APP_ORIGIN ?? process.env.RENDER_EXTERNAL_URL;
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  return "http://127.0.0.1:3000";
+}
+
 export async function createClientOrder(jobId: string, amount: string) {
+  const jobUrl = `${publicOrigin()}/jobs/${jobId}`;
   return paypal("/v2/checkout/orders", {
     method: "POST",
     requestId: `${jobId}-order`,
@@ -117,8 +124,8 @@ export async function createClientOrder(jobId: string, amount: string) {
           experience_context: {
             shipping_preference: "NO_SHIPPING",
             user_action: "PAY_NOW",
-            return_url: "https://example.com/return",
-            cancel_url: "https://example.com/cancel",
+            return_url: jobUrl,
+            cancel_url: jobUrl,
           },
         },
       },
