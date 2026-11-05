@@ -6,6 +6,8 @@ One job. The client pays **$1,200**. Maya receives **$800**. The studio keeps **
 
 Built for the [PayPal AI Hackathon](https://paypal-ai-hackathon.devpost.com/).
 
+Live (Render): [https://hire-brjt.onrender.com](https://hire-brjt.onrender.com) — opens `hire-job-1`.
+
 ## What it does
 
 1. Claude drafts the agreement from the studio notes (summary, $1,200, $800, $400). The server rejects a draft unless those amounts add up.
