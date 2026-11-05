@@ -3,6 +3,8 @@ import { getJob, pool } from "@/lib/db";
 import { serializeEvent, serializeJob } from "@/lib/job";
 import { JobPortal } from "./job-portal";
 
+export const dynamic = "force-dynamic";
+
 export default async function JobPage({
   params,
 }: {

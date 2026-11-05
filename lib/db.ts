@@ -1,25 +1,35 @@
-import { Pool } from "pg";
+import { Pool, type QueryResult, type QueryResultRow } from "pg";
 import { amountsAddUp } from "./money";
-
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error("DATABASE_URL missing");
-}
 
 const globalForDb = globalThis as typeof globalThis & { hirePool?: Pool };
 
-const local = url.includes("localhost") || url.includes("127.0.0.1");
-
-export const pool =
-  globalForDb.hirePool ??
-  new Pool({
+function createPool(): Pool {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL missing");
+  }
+  const local = url.includes("localhost") || url.includes("127.0.0.1");
+  return new Pool({
     connectionString: url,
     ssl: local ? undefined : { rejectUnauthorized: false },
   });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.hirePool = pool;
 }
+
+export function getPool(): Pool {
+  if (!globalForDb.hirePool) {
+    globalForDb.hirePool = createPool();
+  }
+  return globalForDb.hirePool;
+}
+
+export const pool = {
+  query<T extends QueryResultRow = QueryResultRow>(
+    text: string,
+    values?: unknown[],
+  ): Promise<QueryResult<T>> {
+    return getPool().query<T>(text, values);
+  },
+};
 
 export type JobRow = {
   id: string;
