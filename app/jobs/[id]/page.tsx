@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getJob, pool } from "@/lib/db";
-import { debugLog } from "@/lib/debug-log";
 import { serializeEvent, serializeJob } from "@/lib/job";
 import { JobPortal } from "./job-portal";
 
@@ -13,22 +12,6 @@ export default async function JobPage({
 }) {
   const { id } = await params;
   const job = await getJob(id);
-  // #region agent log
-  debugLog(
-    "app/jobs/[id]/page.tsx:getJob",
-    "served job page",
-    {
-      requestedId: id,
-      found: Boolean(job),
-      pinnedHomeId: id === "hire-job-5",
-      clientAgreed: Boolean(job?.client_agreed_at),
-      mayaAgreed: Boolean(job?.maya_agreed_at),
-      paypalOrderId: job?.paypal_order_id ? "set" : null,
-      paypalPayoutItemId: job?.paypal_payout_item_id ? "set" : null,
-    },
-    "A",
-  );
-  // #endregion
   if (!job) notFound();
 
   const events = await pool.query<{

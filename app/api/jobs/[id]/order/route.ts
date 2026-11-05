@@ -1,5 +1,4 @@
 import { getJob, moneyAddsUp, pool } from "@/lib/db";
-import { debugLog } from "@/lib/debug-log";
 import { asString, createClientOrder } from "@/lib/paypal";
 
 export async function POST(
@@ -19,22 +18,6 @@ export async function POST(
   }
 
   const created = await createClientOrder(job.id, job.client_amount, job.work_summary);
-  // #region agent log
-  debugLog(
-    "app/api/jobs/[id]/order/route.ts",
-    "create order result",
-    {
-      jobId: job.id,
-      requestId: `${job.id}-order`,
-      alreadyHadOrderId: Boolean(job.paypal_order_id),
-      ok: created.ok,
-      status: created.status,
-      paypalDebugId: created.debugId,
-      issue: typeof created.json.name === "string" ? created.json.name : null,
-    },
-    "B",
-  );
-  // #endregion
   if (!created.ok) {
     return Response.json(
       { error: "create order failed", debugId: created.debugId, body: created.json },

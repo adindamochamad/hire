@@ -1,4 +1,3 @@
-import { debugLog } from "@/lib/debug-log";
 import { pool } from "@/lib/db";
 import { serializeJob } from "@/lib/job";
 
@@ -11,17 +10,5 @@ export async function POST() {
     [id],
   );
   const job = saved.rows[0];
-  // #region agent log
-  debugLog(
-    "app/api/jobs/route.ts",
-    "created unique job",
-    {
-      jobId: job.id,
-      paypalOrderId: job.paypal_order_id,
-      requestId: `${job.id}-order`,
-    },
-    "D",
-  );
-  // #endregion
   return Response.json({ job: serializeJob(job) }, { status: 201 });
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { debugLog } from "@/lib/debug-log";
 import {
   agreementLocked,
   hasCaptureEvent,
@@ -71,29 +70,6 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const captureDone = hasCaptureEvent(events);
   const payoutDone = hasPayoutEvent(events) && Boolean(job.paypal_payout_item_id);
   const bothAgreed = Boolean(job.client_agreed_at && job.maya_agreed_at);
-
-  useEffect(() => {
-    const composer = document.querySelector(".composer");
-    const box = composer?.getBoundingClientRect();
-    // #region agent log
-    debugLog(
-      "app/jobs/[id]/job-portal.tsx:mount",
-      "job portal controls",
-      {
-        jobId: job.id,
-        status,
-        bothAgreeButtonsOnSamePage: true,
-        newJobControl: true,
-        freeChatInput: true,
-        payoutItemSet: Boolean(job.paypal_payout_item_id),
-        composerWidth: box ? Math.round(box.width) : null,
-        composerHeight: box ? Math.round(box.height) : null,
-        partySwitch: Boolean(document.querySelector(".party-switch")),
-      },
-      "D",
-    );
-    // #endregion
-  }, [job.id, job.paypal_payout_item_id, status]);
 
   function syncForm(next: JobPayload) {
     setSummary(next.work_summary ?? "");

@@ -6,3 +6,5 @@ node_modules
 dist
 .DS_Store
 *.pem
+tsconfig.tsbuildinfo
+.cursor/debug-*.log
