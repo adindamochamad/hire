@@ -4,8 +4,9 @@ Sesi baru di folder `hire/`. Jangan andalkan chat sebelumnya. README akar berbah
 
 ## Sekarang
 
-- Deploy live **0583a37** (manual Render 12:28 WIB). E2E production **PASS** 7 Nov ~19:43 WIB: job `hire-b5694488-73ea-42da-941b-21fbc5f10f83`, order `3YG582564T853972S`, capture `30888125L87426906`, payout `5Y3ZULVJZCAD8`. Bukti: `sandbox-e2e-production.json`, `audit-demo-v4-e2e.md`.
-- Grok v3 = CONDITIONAL (settlement blocked); Grok verifikasi ulang: `docs/grok-e2e-report-prompt.md`.
+- Deploy live **0593136** (push `main` 7 Nov, traceable agreement). URL: https://hire-brjt.onrender.com
+- Sebelumnya **0583a37** E2E PASS 7 Nov; **9027f05** webhook retry 13/13.
+- Grok audit: `docs/grok-webhook-retry-validation-prompt.md`, `docs/grok-e2e-report-prompt.md`.
 - Lokal tetap `hire-job-3`. Deadline 13 Nov; video/Devpost boleh lanjut.
 
 ## Bukti uang (sandbox, lokal)
