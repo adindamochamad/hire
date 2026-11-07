@@ -1,3 +1,5 @@
+import { PayPalAPI } from "@paypal/agent-toolkit/mcp";
+
 type PaypalJson = Record<string, unknown>;
 
 type PaypalResult = {
@@ -104,40 +106,67 @@ function publicOrigin(): string {
   return "http://127.0.0.1:3000";
 }
 
-export async function createClientOrder(jobId: string, amount: string, summary: string | null) {
-  const jobUrl = `${publicOrigin()}/jobs/${jobId}`;
-  return paypal("/v2/checkout/orders", {
-    method: "POST",
-    requestId: `${jobId}-order`,
-    body: {
-      intent: "CAPTURE",
-      purchase_units: [
-        {
-          reference_id: jobId,
-          custom_id: jobId,
-          description: summary?.slice(0, 127) || jobId,
-          amount: { currency_code: "USD", value: amount },
-        },
-      ],
-      payment_source: {
-        paypal: {
-          experience_context: {
-            shipping_preference: "NO_SHIPPING",
-            user_action: "PAY_NOW",
-            return_url: jobUrl,
-            cancel_url: jobUrl,
-          },
-        },
-      },
-    },
+function toolkit(requestId: string, token: string) {
+  return new PayPalAPI(token, {
+    sandbox: true,
+    request_id: requestId,
+    source: "hire",
   });
 }
 
+async function runToolkit(
+  method: string,
+  arg: unknown,
+  requestId: string,
+): Promise<PaypalResult> {
+  const raw = await toolkit(requestId, await accessToken()).run(method, arg);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, status: 502, json: {}, debugId: null, raw };
+  }
+  const record = asRecord(parsed);
+  if (!record || record.error) {
+    return { ok: false, status: 502, json: record ?? {}, debugId: null, raw };
+  }
+  const nested = asRecord(record.response);
+  const json = nested ?? record;
+  return {
+    ok: record.status !== "error",
+    status: record.status === "error" ? 502 : 200,
+    json,
+    debugId: null,
+    raw,
+  };
+}
+
+export async function createClientOrder(jobId: string, amount: string, summary: string | null) {
+  const jobUrl = `${publicOrigin()}/jobs/${jobId}`;
+  const cost = Number(amount);
+  return runToolkit(
+    "create_order",
+    {
+      currencyCode: "USD",
+      items: [
+        {
+          name: (summary ?? jobId).slice(0, 127),
+          quantity: 1,
+          itemCost: cost,
+          itemTotal: cost,
+          taxPercent: 0,
+          description: `Hire job ${jobId}`,
+        },
+      ],
+      returnUrl: jobUrl,
+      cancelUrl: jobUrl,
+    },
+    `${jobId}-order`,
+  );
+}
+
 export async function captureOrder(orderId: string, jobId: string) {
-  return paypal(`/v2/checkout/orders/${orderId}/capture`, {
-    method: "POST",
-    requestId: `${jobId}-capture`,
-  });
+  return runToolkit("pay_order", { id: orderId }, `${jobId}-capture`);
 }
 
 export async function payoutMaya(

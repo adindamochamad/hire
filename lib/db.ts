@@ -50,6 +50,17 @@ export async function getJob(id: string): Promise<JobRow | null> {
   return result.rows[0] ?? null;
 }
 
+export async function insertJob(): Promise<JobRow> {
+  const id = `hire-${crypto.randomUUID()}`;
+  const saved = await pool.query<JobRow>(
+    `insert into jobs (id, work_summary, client_amount, maya_amount, studio_amount)
+     values ($1, null, 1200.00, 800.00, 400.00)
+     returning *`,
+    [id],
+  );
+  return saved.rows[0];
+}
+
 export function moneyAddsUp(job: JobRow): boolean {
   return amountsAddUp(job.client_amount, job.maya_amount, job.studio_amount);
 }

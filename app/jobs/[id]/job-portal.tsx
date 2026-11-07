@@ -352,7 +352,10 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                 </label>
               </div>
               {!amountsAddUp(clientAmount, mayaAmount, studioAmount) ? (
-                <p className="banner">Client amount must equal Maya share plus studio remainder.</p>
+                <p className="banner">
+                  Client, Maya, and studio amounts must each be greater than zero, and the client
+                  amount must equal Maya plus studio.
+                </p>
               ) : null}
               <div className="actions">
                 <button
@@ -367,8 +370,8 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
             </>
           )}
           <p className="lede">
-            This studio view can record both agreements. Press New Job so the next reviewer gets a
-            fresh PayPal request id.
+            This studio view can record both agreements. The home page opens a fresh PayPal request
+            id.
           </p>
           <div className="party-row">
             <div>
@@ -540,9 +543,10 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
           <section className="card">
             <h2>PayPal</h2>
             <p className="lede">
-              The order uses the stored {formatUsd(job.client_amount)}. Maya is paid{" "}
-              {formatUsd(job.maya_amount)} only after capture is confirmed. The model does not pick the
-              PayPal amount.
+              The order is created with PayPal Agent Toolkit{" "}
+              <code>create_order</code> from the stored {formatUsd(job.client_amount)}. Capture uses{" "}
+              <code>pay_order</code>. Maya is paid {formatUsd(job.maya_amount)} on Payouts v1 only after
+              the capture webhook. The model does not pick the PayPal amount.
             </p>
             {captureDone ? (
               <p className="settled">

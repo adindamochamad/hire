@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
+import { insertJob } from "@/lib/db";
 
-export default function Home() {
-  redirect("/jobs/hire-job-5");
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const job = await insertJob();
+  redirect(`/jobs/${job.id}`);
 }

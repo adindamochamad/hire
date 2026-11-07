@@ -23,7 +23,7 @@ export function amountsAddUp(
   const maya = toCents(mayaAmount);
   const studio = toCents(studioAmount);
   if (client === null || maya === null || studio === null) return false;
-  if (client <= 0 || maya < 0 || studio < 0) return false;
+  if (client <= 0 || maya <= 0 || studio <= 0) return false;
   return client === maya + studio;
 }
 

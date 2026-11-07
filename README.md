@@ -4,33 +4,31 @@ The job page where a client payment becomes Maya’s payout.
 
 The model drafts the agreement. **It does not choose the money that moves.** The client amount, Maya’s share, and the studio remainder come from the job row. The server rejects a draft unless those three numbers add up. Paid status exists only when a real PayPal sandbox id is stored.
 
-Built for the [PayPal AI Hackathon](https://paypal-ai-hackathon.devpost.com/).
+Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 Live (Render): [https://hire-brjt.onrender.com](https://hire-brjt.onrender.com)
 
-Press **New Job** for a unique row (and unique PayPal request ids) so each reviewer can start clean.
+The home page opens a **new job** (unique PayPal request ids) so each reviewer can start clean.
 
 ## What it does
 
 1. Notes can be free-form, including negotiation and messy numbers. Claude drafts `workSummary` plus three amounts. The server rejects the draft unless the stored split adds up.
 2. Maya and the client agree on the stored numbers.
-3. The server creates a PayPal Orders v2 payment from `jobs.client_amount`, not from a fresh model call. `PayPal-Request-Id` is `${jobId}-order`.
-4. After the client approves, the server captures the order.
-5. Only after a verified `PAYMENT.CAPTURE.COMPLETED` webhook, and only if the capture is the stored order for the stored client amount, does the server send a Payouts v1 payment of `jobs.maya_amount` to Maya’s sandbox email.
+3. After both parties agree, the server calls PayPal Agent Toolkit `create_order` with `jobs.client_amount`. The model does not pass the amount. `PayPal-Request-Id` is `${jobId}-order`.
+4. After the client approves, the server captures with Agent Toolkit `pay_order`.
+5. Only after a verified `PAYMENT.CAPTURE.COMPLETED` webhook, and only if the capture is the stored order for the stored client amount, does the server send a Payouts v1 payment of `jobs.maya_amount` to Maya’s sandbox email. The toolkit has no payouts tool.
 6. `PAYMENT.PAYOUTS-ITEM.SUCCEEDED` closes Maya’s share when the payout item amount matches. The job still shows the studio remainder.
 
-The seed split is client **$1,200**, Maya **$800**, studio **$400**. Copy on the page reads those fields; it does not invent a second set of numbers.
-
-PayPal Agent Toolkit `create_order` is not used for capture or payout. That tool would let a model pick the amount. Hire calls Orders v2 and Payouts v1 with the job row and job-id idempotency keys instead.
+The seed split is client **$1,200**, Maya **$800**, studio **$400**. Copy on the page reads those fields; it does not invent a second set of numbers. Client, Maya, and studio amounts must each be greater than zero.
 
 ## PayPal APIs
 
 Sandbox only (`https://api-m.sandbox.paypal.com`).
 
-| Step | Endpoint |
+| Step | How |
 | --- | --- |
-| Create order | `POST /v2/checkout/orders` (intent `CAPTURE`, amount from the job row) |
-| Capture | `POST /v2/checkout/orders/{id}/capture` |
+| Create order | PayPal Agent Toolkit `create_order` ([agent tools](https://developer.paypal.com/ai-tools/agent-tools); amount from the job row) |
+| Capture | PayPal Agent Toolkit `pay_order` |
 | Verify webhook | `POST /v1/notifications/verify-webhook-signature` |
 | Pay Maya | `POST /v1/payments/payouts` (`PayPal-Request-Id` and `sender_batch_id` from the job id) |
 
@@ -38,12 +36,11 @@ Sandbox only (`https://api-m.sandbox.paypal.com`).
 
 ## Try the sandbox
 
-1. Open the live URL. If the first request is slow, wait; a keep-alive hits `/api/health`.
-2. Press **New Job**.
-3. Add notes, including ambiguous figures if you want, then **Draft agreement from notes**.
-4. Record Maya and client agreement.
-5. Pay with a PayPal **sandbox** buyer account. This repo does not ship buyer passwords.
-6. Capture, then wait for the capture webhook and Maya’s payout item id.
+1. Open the live URL. It creates a new job. If the first request is slow, wait; a keep-alive hits `/api/health`.
+2. Add notes, including ambiguous figures if you want, then **Draft agreement from notes**.
+3. Record Maya and client agreement.
+4. Pay with a PayPal **sandbox** buyer account. This repo does not ship buyer passwords.
+5. Capture, then wait for the capture webhook and Maya’s payout item id.
 
 ## Local
 
