@@ -726,6 +726,130 @@ textarea {
   color: var(--muted);
 }
 
+.evidence-card,
+.clarify-card,
+.revision-diff {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.evidence-card h2,
+.clarify-card h2,
+.revision-diff h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.05rem;
+}
+
+.evidence-row + .evidence-row {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
+.evidence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.evidence-label {
+  font-weight: 650;
+}
+
+.evidence-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.evidence-badge.quoted {
+  color: var(--teal-dark);
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+.evidence-badge.calculated {
+  color: var(--amber);
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.evidence-badge.needs-clarification {
+  color: var(--red);
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.evidence-value {
+  margin: 0.25rem 0;
+  font-size: 1.05rem;
+}
+
+.evidence-quote {
+  margin: 0.35rem 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.evidence-formula {
+  margin: 0.35rem 0;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+
+.evidence-link {
+  margin-right: 0.5rem;
+}
+
+.message-highlight {
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
+  border-radius: 0.5rem;
+}
+
+.clarify-card ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.revision-diff dl {
+  margin: 0.75rem 0;
+}
+
+.revision-diff dt {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.revision-diff dd {
+  margin: 0.15rem 0 0.65rem;
+}
+
+.diff-old {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.diff-arrow {
+  margin: 0 0.35rem;
+  color: var(--muted);
+}
+
+.diff-new {
+  font-weight: 650;
+}
+
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;

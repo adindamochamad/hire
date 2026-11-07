@@ -42,8 +42,48 @@ export type JobRow = {
   paypal_capture_id: string | null;
   paypal_payout_batch_id: string | null;
   paypal_payout_item_id: string | null;
+  agreement_version: number;
+  agreement_status: string | null;
+  agreement_evidence: unknown;
   created_at: Date;
 };
+
+export type JobMessageRow = {
+  id: string;
+  job_id: string;
+  party: "studio" | "maya" | "client";
+  author_name: string;
+  body: string;
+  created_at: Date;
+};
+
+export async function listJobMessages(jobId: string): Promise<JobMessageRow[]> {
+  const result = await pool.query<JobMessageRow>(
+    `select id, job_id, party, author_name, body, created_at
+     from job_messages
+     where job_id = $1
+     order by created_at`,
+    [jobId],
+  );
+  return result.rows;
+}
+
+export async function insertJobMessage(
+  jobId: string,
+  party: "studio" | "maya" | "client",
+  authorName: string,
+  body: string,
+  id?: string,
+): Promise<JobMessageRow> {
+  const messageId = id ?? `msg-${crypto.randomUUID()}`;
+  const saved = await pool.query<JobMessageRow>(
+    `insert into job_messages (id, job_id, party, author_name, body)
+     values ($1, $2, $3, $4, $5)
+     returning *`,
+    [messageId, jobId, party, authorName, body],
+  );
+  return saved.rows[0];
+}
 
 export async function getJob(id: string): Promise<JobRow | null> {
   const result = await pool.query<JobRow>("select * from jobs where id = $1", [id]);

@@ -12,7 +12,7 @@ The home page opens a **new job** (unique PayPal request ids) so each reviewer c
 
 ## What it does
 
-1. Notes can be free-form, including negotiation and messy numbers. Claude drafts `workSummary` plus three amounts. The server rejects the draft unless the stored split adds up.
+1. Notes are stored per job. The server drafts `workSummary` and three amounts from the thread with quoted or calculated evidence. Ambiguous threads return clarification questions instead of guessed numbers. PayPal amounts always come from the job row after draft/save.
 2. Maya and the client agree on the stored numbers.
 3. After both parties agree, the server calls PayPal Agent Toolkit `create_order` with `jobs.client_amount`. The model does not pass the amount. `PayPal-Request-Id` is `${jobId}-order`.
 4. After the client approves, the server captures with Agent Toolkit `pay_order`.
@@ -48,8 +48,11 @@ Sandbox only (`https://api-m.sandbox.paypal.com`).
 cp .env.example .env
 docker compose up -d db
 npm install
+npm run db:migrate
 npm run dev
 ```
+
+Tests: `npm run test:webhooks` (13 cases), `npm run test:agreement` (10 cases). Requires local Postgres with `DATABASE_URL`.
 
 Open [http://127.0.0.1:3000/](http://127.0.0.1:3000/).
 

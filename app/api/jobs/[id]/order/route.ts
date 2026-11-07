@@ -1,23 +1,28 @@
-import { getJob, moneyAddsUp, pool } from "@/lib/db";
+import { getJob, pool } from "@/lib/db";
+import { orderEligibility } from "@/lib/order-eligibility";
 import { asString, createClientOrder } from "@/lib/paypal";
 
+export type CreateClientOrderFn = typeof createClientOrder;
+
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
+  options?: { createClientOrder?: CreateClientOrderFn },
 ) {
   const { id } = await params;
   const job = await getJob(id);
   if (!job) {
     return Response.json({ error: "job not found" }, { status: 404 });
   }
-  if (!moneyAddsUp(job)) {
-    return Response.json({ error: "stored amounts do not add up" }, { status: 422 });
-  }
-  if (!job.client_agreed_at || !job.maya_agreed_at) {
-    return Response.json({ error: "both parties must agree first" }, { status: 409 });
+  const eligible = orderEligibility(job);
+  if (!eligible.ok) {
+    const status = eligible.error.includes("add up") ? 422 : 409;
+    return Response.json({ error: eligible.error }, { status });
   }
 
-  const created = await createClientOrder(job.id, job.client_amount, job.work_summary);
+  void request;
+  const createOrder = options?.createClientOrder ?? createClientOrder;
+  const created = await createOrder(job.id, job.client_amount, job.work_summary);
   if (!created.ok) {
     return Response.json(
       { error: "create order failed", debugId: created.debugId, body: created.json },

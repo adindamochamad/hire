@@ -4,10 +4,9 @@ Sesi baru di folder `hire/`. Jangan andalkan chat sebelumnya. README akar berbah
 
 ## Sekarang
 
-- Stage **2 → 3 prep**. Audit Grok v3 (**CONDITIONAL**, 7 Nov ~10:24–10:26 WIB): custom split + draft + agree + sandbox **order** lulus; capture/payout **blocked** (buyer login). Live **belum** SHA `128de31` — `/` masih 307 ke `hire-job-5` (`x-nextjs-cache: HIT`), PATCH `2000/0/2000` masih **200**. Recheck 10:35 WIB sama.
-- Setiap demo: mulai dari **New Job**, jangan seed. Jangan klaim paid tanpa `paypal_capture_id` / `paypal_payout_item_id`.
-- Job bukti lokal: **`hire-job-3`**. Prompt: `docs/grok-audit-prompt.md`. Hasil: `audit-demo-v3.md`.
-- Deadline: **13 Nov 2026, 03:00 WIB**. Video/Devpost **setelah** live SHA baru + satu run buyer sandbox.
+- Deploy live **0583a37** (manual Render 12:28 WIB). E2E production **PASS** 7 Nov ~19:43 WIB: job `hire-b5694488-73ea-42da-941b-21fbc5f10f83`, order `3YG582564T853972S`, capture `30888125L87426906`, payout `5Y3ZULVJZCAD8`. Bukti: `sandbox-e2e-production.json`, `audit-demo-v4-e2e.md`.
+- Grok v3 = CONDITIONAL (settlement blocked); Grok verifikasi ulang: `docs/grok-e2e-report-prompt.md`.
+- Lokal tetap `hire-job-3`. Deadline 13 Nov; video/Devpost boleh lanjut.
 
 ## Bukti uang (sandbox, lokal)
 

@@ -10,7 +10,8 @@
     "start": "node scripts/migrate.mjs && next start",
     "db:up": "docker compose up -d db",
     "db:migrate": "docker compose exec -T db psql -U hire -d hire -f /docker-entrypoint-initdb.d/schema.sql",
-    "test:webhooks": "tsx scripts/webhook-behavior-test.ts"
+    "test:webhooks": "tsx scripts/webhook-behavior-test.ts",
+    "test:agreement": "tsx scripts/agreement-behavior-test.ts"
   },
   "dependencies": {
     "@paypal/agent-toolkit": "^1.11.0",

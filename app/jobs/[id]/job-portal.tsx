@@ -1,22 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   agreementLocked,
   jobStatus,
   statusLabel,
+  type JobMessagePayload,
   type JobPayload,
   type PaypalEventPayload,
 } from "@/lib/job";
 import { amountsAddUp, formatUsd, splitCopy } from "@/lib/money";
-import { BACKUP_THREAD, DEMO_THREAD, draftMessages, type ThreadMessage } from "@/lib/thread";
+import { BACKUP_THREAD, DEMO_THREAD, type ThreadMessage } from "@/lib/thread";
+import { AgreementEvidencePanel } from "./agreement-evidence";
 
 type ScriptId = "main" | "backup" | "blank";
 
 type Props = {
   initialJob: JobPayload;
   initialEvents: PaypalEventPayload[];
+  initialMessages: JobMessagePayload[];
+  initialClarificationQuestions: string[];
 };
+
+function toThread(messages: JobMessagePayload[]): ThreadMessage[] {
+  return messages.map((message) => ({
+    id: message.id,
+    party: message.party,
+    name: message.author_name,
+    body: message.body,
+  }));
+}
 
 type Busy =
   | "idle"
@@ -27,7 +40,8 @@ type Busy =
   | "order"
   | "capture"
   | "refresh"
-  | "create";
+  | "create"
+  | "note";
 
 function errorMessage(payload: unknown, fallback: string): string {
   if (payload && typeof payload === "object" && "error" in payload) {
@@ -47,12 +61,17 @@ function formatWhen(value: string | null): string {
   });
 }
 
-export function JobPortal({ initialJob, initialEvents }: Props) {
+export function JobPortal({
+  initialJob,
+  initialEvents,
+  initialMessages,
+  initialClarificationQuestions,
+}: Props) {
   const [job, setJob] = useState(initialJob);
   const [events, setEvents] = useState(initialEvents);
-  const [script, setScript] = useState<ScriptId>(initialJob.work_summary ? "main" : "blank");
+  const [script, setScript] = useState<ScriptId>(initialMessages.length > 0 ? "main" : "blank");
   const [thread, setThread] = useState<ThreadMessage[]>(
-    initialJob.work_summary ? DEMO_THREAD : [],
+    initialMessages.length > 0 ? toThread(initialMessages) : [],
   );
   const [summary, setSummary] = useState(initialJob.work_summary ?? "");
   const [clientAmount, setClientAmount] = useState(initialJob.client_amount);
@@ -62,7 +81,13 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [approveUrl, setApproveUrl] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  const [noteParty, setNoteParty] = useState<ThreadMessage["party"]>("studio");
+  const [noteParty, setNoteParty] = useState<"studio" | "maya" | "client">("studio");
+  const [clarificationQuestions, setClarificationQuestions] = useState(
+    initialClarificationQuestions,
+  );
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState(false);
+  const messageRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const status = jobStatus(job, events);
   const locked = agreementLocked(job);
@@ -70,6 +95,14 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const captureDone = Boolean(job.paypal_capture_id);
   const payoutDone = Boolean(job.paypal_payout_item_id);
   const bothAgreed = Boolean(job.client_agreed_at && job.maya_agreed_at);
+  const needsClarification = job.agreement_status === "needs_clarification";
+  const canAgree =
+    amountsOk && Boolean(job.work_summary) && !needsClarification && job.agreement_status !== "needs_clarification";
+  const formDirty =
+    summary !== (job.work_summary ?? "") ||
+    clientAmount !== job.client_amount ||
+    mayaAmount !== job.maya_amount ||
+    studioAmount !== job.studio_amount;
 
   function syncForm(next: JobPayload) {
     setSummary(next.work_summary ?? "");
@@ -80,14 +113,55 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
 
   async function refresh(): Promise<{ job: JobPayload; events: PaypalEventPayload[] }> {
     const res = await fetch(`/api/jobs/${job.id}`, { cache: "no-store" });
-    const payload = (await res.json()) as { job?: JobPayload; events?: PaypalEventPayload[]; error?: string };
+    const payload = (await res.json()) as {
+      job?: JobPayload;
+      events?: PaypalEventPayload[];
+      messages?: JobMessagePayload[];
+      clarificationQuestions?: string[];
+      error?: string;
+    };
     if (!res.ok || !payload.job) {
       throw new Error(payload.error ?? "could not refresh job");
     }
     setJob(payload.job);
     setEvents(payload.events ?? []);
+    if (payload.messages) setThread(toThread(payload.messages));
+    setClarificationQuestions(payload.clarificationQuestions ?? []);
     syncForm(payload.job);
     return { job: payload.job, events: payload.events ?? [] };
+  }
+
+  function viewSource(messageId: string) {
+    setHighlightedMessageId(messageId);
+    const node = messageRefs.current[messageId];
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => setHighlightedMessageId(null), 2400);
+  }
+
+  async function seedStarterMessages(starter: ThreadMessage[]) {
+    for (const message of starter) {
+      const res = await fetch(`/api/jobs/${job.id}/messages`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          party: message.party,
+          authorName: message.name,
+          body: message.body,
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(errorMessage(payload, "could not save note"));
+      const saved = payload.message as JobMessagePayload;
+      setThread((current) => [
+        ...current,
+        {
+          id: saved.id,
+          party: saved.party,
+          name: saved.author_name,
+          body: saved.body,
+        },
+      ]);
+    }
   }
 
   async function createJob() {
@@ -99,25 +173,38 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
     });
   }
 
-  function addNote() {
+  async function addNote() {
     const body = note.trim();
     if (!body) return;
-    const names: Record<ThreadMessage["party"], string> = {
+    const names: Record<Exclude<ThreadMessage["party"], "system">, string> = {
       studio: "Studio",
       maya: "Maya",
       client: "Client",
-      system: "Hire",
     };
-    setThread((current) => [
-      ...current,
-      {
-        id: `n-${Date.now()}`,
-        party: noteParty,
-        name: names[noteParty],
-        body,
-      },
-    ]);
-    setNote("");
+    await run("note", async () => {
+      const res = await fetch(`/api/jobs/${job.id}/messages`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          party: noteParty,
+          authorName: names[noteParty],
+          body,
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(errorMessage(payload, "could not save note"));
+      const saved = payload.message as JobMessagePayload;
+      setThread((current) => [
+        ...current,
+        {
+          id: saved.id,
+          party: saved.party,
+          name: saved.author_name,
+          body: saved.body,
+        },
+      ]);
+      setNote("");
+    });
   }
 
   async function run(kind: Busy, work: () => Promise<void>) {
@@ -137,30 +224,26 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
       const res = await fetch(`/api/jobs/${job.id}/draft`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: draftMessages(thread) }),
+        body: JSON.stringify({}),
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(errorMessage(payload, "draft failed"));
       const next = payload.job as JobPayload;
       setJob(next);
       syncForm(next);
-      setThread((current) =>
-        current.some((item) => item.id === "system-draft")
-          ? current
-          : [
-              ...current,
-              {
-                id: "system-draft",
-                party: "system",
-                name: "Hire",
-                body: "Agreement updated from conversation.",
-              },
-            ],
-      );
+      if (payload.draft?.questions) {
+        setClarificationQuestions(payload.draft.questions as string[]);
+      } else {
+        setClarificationQuestions([]);
+      }
     });
   }
 
   async function saveAgreement() {
+    if (!pendingSave && formDirty) {
+      setPendingSave(true);
+      return;
+    }
     await run("save", async () => {
       const res = await fetch(`/api/jobs/${job.id}`, {
         method: "PATCH",
@@ -177,6 +260,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
       const next = payload.job as JobPayload;
       setJob(next);
       syncForm(next);
+      setPendingSave(false);
     });
   }
 
@@ -185,7 +269,10 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
       const res = await fetch(`/api/jobs/${job.id}/agree`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ party }),
+        body: JSON.stringify({
+          party,
+          agreementVersion: job.agreement_version > 0 ? job.agreement_version : undefined,
+        }),
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(errorMessage(payload, "could not record agreement"));
@@ -307,6 +394,22 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
           )}
           <p className="lede">{splitCopy(job.client_amount, job.maya_amount, job.studio_amount)}</p>
           {error ? <p className="banner">{error}</p> : null}
+          {needsClarification && clarificationQuestions.length > 0 ? (
+            <div className="clarify-card" role="status">
+              <h2>Needs clarification</h2>
+              <ul>
+                {clarificationQuestions.map((question) => (
+                  <li key={question}>{question}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <AgreementEvidencePanel job={job} onViewSource={viewSource} />
+          {locked ? (
+            <p className="banner">
+              This job already has a PayPal order. Start a new job to negotiate a different agreement.
+            </p>
+          ) : null}
           {locked ? (
             <dl className="sheet-money">
               <div>
@@ -359,16 +462,83 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                   amount must equal Maya plus studio.
                 </p>
               ) : null}
-              <div className="actions">
-                <button
-                  className="secondary"
-                  disabled={busy !== "idle"}
-                  onClick={() => void saveAgreement()}
-                  type="button"
-                >
-                  {busy === "save" ? "Saving…" : "Save agreement"}
-                </button>
-              </div>
+              {pendingSave && formDirty ? (
+                <div className="revision-diff">
+                  <h2>Review changes</h2>
+                  <p className="lede">Saving resets Maya and client agreement on this version.</p>
+                  <dl>
+                    {summary !== (job.work_summary ?? "") ? (
+                      <div>
+                        <dt>Work summary</dt>
+                        <dd>
+                          <span className="diff-old">{job.work_summary ?? "—"}</span>
+                          <span className="diff-arrow">→</span>
+                          <span className="diff-new">{summary}</span>
+                        </dd>
+                      </div>
+                    ) : null}
+                    {clientAmount !== job.client_amount ? (
+                      <div>
+                        <dt>Client pays</dt>
+                        <dd>
+                          <span className="diff-old">{formatUsd(job.client_amount)}</span>
+                          <span className="diff-arrow">→</span>
+                          <span className="diff-new">{formatUsd(clientAmount)}</span>
+                        </dd>
+                      </div>
+                    ) : null}
+                    {mayaAmount !== job.maya_amount ? (
+                      <div>
+                        <dt>Maya receives</dt>
+                        <dd>
+                          <span className="diff-old">{formatUsd(job.maya_amount)}</span>
+                          <span className="diff-arrow">→</span>
+                          <span className="diff-new">{formatUsd(mayaAmount)}</span>
+                        </dd>
+                      </div>
+                    ) : null}
+                    {studioAmount !== job.studio_amount ? (
+                      <div>
+                        <dt>Studio keeps</dt>
+                        <dd>
+                          <span className="diff-old">{formatUsd(job.studio_amount)}</span>
+                          <span className="diff-arrow">→</span>
+                          <span className="diff-new">{formatUsd(studioAmount)}</span>
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                  <div className="actions">
+                    <button
+                      className="secondary"
+                      disabled={busy !== "idle"}
+                      onClick={() => setPendingSave(false)}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="primary"
+                      disabled={busy !== "idle" || !amountsAddUp(clientAmount, mayaAmount, studioAmount)}
+                      onClick={() => void saveAgreement()}
+                      type="button"
+                    >
+                      {busy === "save" ? "Saving…" : "Confirm save"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="actions">
+                  <button
+                    className="secondary"
+                    disabled={busy !== "idle" || !formDirty}
+                    onClick={() => void saveAgreement()}
+                    type="button"
+                  >
+                    {busy === "save" ? "Saving…" : "Save agreement"}
+                  </button>
+                </div>
+              )}
             </>
           )}
           <p className="lede">
@@ -382,10 +552,10 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                 {job.maya_agreed_at ? `Agreed ${formatWhen(job.maya_agreed_at)}` : "Not agreed"}
               </div>
             </div>
-            {job.maya_agreed_at ? null : (
+            {job.maya_agreed_at || locked ? null : (
               <button
                 className="primary"
-                disabled={busy !== "idle" || !amountsOk}
+                disabled={busy !== "idle" || !canAgree}
                 onClick={() => void agree("maya")}
                 type="button"
               >
@@ -400,10 +570,10 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                 {job.client_agreed_at ? `Agreed ${formatWhen(job.client_agreed_at)}` : "Not agreed"}
               </div>
             </div>
-            {job.client_agreed_at ? null : (
+            {job.client_agreed_at || locked ? null : (
               <button
                 className="primary"
-                disabled={busy !== "idle" || !amountsOk}
+                disabled={busy !== "idle" || !canAgree}
                 onClick={() => void agree("client")}
                 type="button"
               >
@@ -418,9 +588,13 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
               <div className="script-switch" role="group" aria-label="Starter notes">
                 <button
                   className={script === "main" ? "active" : undefined}
+                  disabled={locked || busy !== "idle"}
                   onClick={() => {
-                    setScript("main");
-                    setThread(DEMO_THREAD);
+                    void run("note", async () => {
+                      setScript("main");
+                      setThread([]);
+                      await seedStarterMessages(DEMO_THREAD);
+                    });
                   }}
                   type="button"
                 >
@@ -428,9 +602,13 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                 </button>
                 <button
                   className={script === "backup" ? "active" : undefined}
+                  disabled={locked || busy !== "idle"}
                   onClick={() => {
-                    setScript("backup");
-                    setThread(BACKUP_THREAD);
+                    void run("note", async () => {
+                      setScript("backup");
+                      setThread([]);
+                      await seedStarterMessages(BACKUP_THREAD);
+                    });
                   }}
                   type="button"
                 >
@@ -443,7 +621,13 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
                 <p className="empty">No notes yet. Add a free-form note, or load an example.</p>
               ) : (
                 thread.map((message) => (
-                  <article className="message" key={message.id}>
+                  <article
+                    className={`message${highlightedMessageId === message.id ? " message-highlight" : ""}`}
+                    key={message.id}
+                    ref={(node) => {
+                      messageRefs.current[message.id] = node;
+                    }}
+                  >
                     <div className={`avatar ${message.party}`} aria-hidden>
                       {message.name.slice(0, 1)}
                     </div>
@@ -561,7 +745,7 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
               <div className="actions pay-actions">
                 <button
                   className="primary"
-                  disabled={busy !== "idle" || !bothAgreed}
+                  disabled={busy !== "idle" || !bothAgreed || needsClarification}
                   onClick={() => void createOrder()}
                   type="button"
                 >

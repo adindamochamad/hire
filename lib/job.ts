@@ -1,3 +1,4 @@
+import type { AgreementEvidence } from "./agreement";
 import type { JobRow } from "./db";
 import { amountsAddUp } from "./money";
 
@@ -13,6 +14,17 @@ export type JobPayload = {
   paypal_capture_id: string | null;
   paypal_payout_batch_id: string | null;
   paypal_payout_item_id: string | null;
+  agreement_version: number;
+  agreement_status: "ready" | "needs_clarification" | null;
+  agreement_evidence: AgreementEvidence | null;
+  created_at: string;
+};
+
+export type JobMessagePayload = {
+  id: string;
+  party: "studio" | "maya" | "client";
+  author_name: string;
+  body: string;
   created_at: string;
 };
 
@@ -36,6 +48,11 @@ function iso(value: Date | string | null | undefined): string | null {
 }
 
 export function serializeJob(job: JobRow): JobPayload {
+  const evidence = job.agreement_evidence;
+  const parsedEvidence =
+    evidence && typeof evidence === "object" && !Array.isArray(evidence)
+      ? (evidence as AgreementEvidence)
+      : null;
   return {
     id: job.id,
     work_summary: job.work_summary,
@@ -48,7 +65,29 @@ export function serializeJob(job: JobRow): JobPayload {
     paypal_capture_id: job.paypal_capture_id,
     paypal_payout_batch_id: job.paypal_payout_batch_id,
     paypal_payout_item_id: job.paypal_payout_item_id,
+    agreement_version: Number(job.agreement_version ?? 0),
+    agreement_status:
+      job.agreement_status === "ready" || job.agreement_status === "needs_clarification"
+        ? job.agreement_status
+        : null,
+    agreement_evidence: parsedEvidence,
     created_at: iso(job.created_at) ?? new Date().toISOString(),
+  };
+}
+
+export function serializeMessage(row: {
+  id: string;
+  party: "studio" | "maya" | "client";
+  author_name: string;
+  body: string;
+  created_at: Date | string;
+}): JobMessagePayload {
+  return {
+    id: row.id,
+    party: row.party,
+    author_name: row.author_name,
+    body: row.body,
+    created_at: iso(row.created_at) ?? new Date().toISOString(),
   };
 }
 
@@ -79,7 +118,10 @@ export function jobStatus(job: JobPayload, _events?: PaypalEventPayload[]): JobS
   if (job.paypal_capture_id) return "paying_maya";
   const amountsOk = amountsAddUp(job.client_amount, job.maya_amount, job.studio_amount);
   if (job.client_agreed_at && job.maya_agreed_at && amountsOk) return "awaiting_payment";
-  if (job.work_summary && amountsOk) return "awaiting_agreement";
+  if (job.agreement_status === "needs_clarification") return "drafting";
+  if (job.work_summary && amountsOk) {
+    return "awaiting_agreement";
+  }
   return "drafting";
 }
 
@@ -99,5 +141,9 @@ export function statusLabel(status: JobStatus): string {
 }
 
 export function agreementLocked(job: JobPayload): boolean {
-  return Boolean(job.client_agreed_at || job.maya_agreed_at || job.paypal_order_id);
+  return Boolean(job.paypal_order_id);
+}
+
+export function agreementEditable(job: JobPayload): boolean {
+  return !job.paypal_order_id;
 }
