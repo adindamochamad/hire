@@ -1,4 +1,4 @@
-import { getJob, moneyAddsUp, pool } from "@/lib/db";
+import { getJob, moneyAddsUp } from "@/lib/db";
 import { asRecord, asString, captureOrder } from "@/lib/paypal";
 
 export async function POST(
@@ -30,11 +30,6 @@ export async function POST(
   const capture = asRecord(captures[0]);
   const captureId = asString(capture?.id);
   const captureStatus = asString(capture?.status);
-
-  await pool.query(
-    `update jobs set paypal_capture_id = coalesce(paypal_capture_id, $2) where id = $1`,
-    [job.id, captureId],
-  );
 
   return Response.json({
     orderId: job.paypal_order_id,

@@ -53,7 +53,7 @@ npm run dev
 
 Open [http://127.0.0.1:3000/](http://127.0.0.1:3000/).
 
-Required in `.env`: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MAYA_EMAIL`, `PAYPAL_WEBHOOK_ID`, `DATABASE_URL`, and `ANTHROPIC_API_KEY`. Never commit `.env`.
+Required in `.env`: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_API_BASE`, `PAYPAL_MAYA_EMAIL`, `PAYPAL_WEBHOOK_ID`, `DATABASE_URL`, `APP_ORIGIN`, and `ANTHROPIC_API_KEY`. Never commit `.env`. `PAYPAL_API_BASE` is `https://api-m.sandbox.paypal.com`. On Render, `APP_ORIGIN` can be `RENDER_EXTERNAL_URL`.
 
 For local webhooks, expose `/api/webhooks/paypal` over HTTPS, then:
 

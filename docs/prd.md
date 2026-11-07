@@ -101,7 +101,7 @@ Kapasitas ~8 jam/hari. Buffer ada di 11–12 Nov: tidak ada fitur baru. Kunci vi
 ## 11. Submission Checklist
 
 - [x] Capture dan payout sandbox lulus lokal (4 Nov). Belum di URL deploy
-- [ ] Capture dan payout jalan di URL yang di-deploy, diuji ulang setelah deploy
+- [ ] Capture dan payout jalan di URL yang di-deploy (audit v3: order OK, settlement blocked di buyer login; live SHA belum `128de31`)
 - [x] Draf model terlihat, dan order tidak memakai angka liar (lokal, 5 Nov). Belum di URL deploy
 - [x] Repo publik, LICENSE di About, README, `.env.example`, tanpa secret
 - [ ] Video di bawah 3:00, YouTube publik, aplikasi berjalan, tanpa musik berlisensi

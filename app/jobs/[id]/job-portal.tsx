@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   agreementLocked,
-  hasCaptureEvent,
-  hasPayoutEvent,
   jobStatus,
   statusLabel,
   type JobPayload,
@@ -69,8 +67,8 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
   const status = jobStatus(job, events);
   const locked = agreementLocked(job);
   const amountsOk = amountsAddUp(job.client_amount, job.maya_amount, job.studio_amount);
-  const captureDone = hasCaptureEvent(events);
-  const payoutDone = hasPayoutEvent(events) && Boolean(job.paypal_payout_item_id);
+  const captureDone = Boolean(job.paypal_capture_id);
+  const payoutDone = Boolean(job.paypal_payout_item_id);
   const bothAgreed = Boolean(job.client_agreed_at && job.maya_agreed_at);
 
   function syncForm(next: JobPayload) {
@@ -251,15 +249,19 @@ export function JobPortal({ initialJob, initialEvents }: Props) {
       },
       {
         key: "capture",
-        title: `Client paid ${formatUsd(job.client_amount)}`,
+        title: captureDone
+          ? `Client paid ${formatUsd(job.client_amount)}`
+          : `Client payment pending ${formatUsd(job.client_amount)}`,
         copy: captureDone
-          ? `PAYMENT.CAPTURE.COMPLETED · ${job.paypal_capture_id ?? "stored"}`
+          ? `PAYMENT.CAPTURE.COMPLETED · ${job.paypal_capture_id}`
           : "Payout starts after client payment is confirmed.",
         state: captureDone ? "done" : bothAgreed ? "waiting" : "pending",
       },
       {
         key: "payout",
-        title: `Maya paid ${formatUsd(job.maya_amount)}`,
+        title: payoutDone
+          ? `Maya paid ${formatUsd(job.maya_amount)}`
+          : `Maya payout pending ${formatUsd(job.maya_amount)}`,
         copy: payoutDone
           ? `PAYMENT.PAYOUTS-ITEM.SUCCEEDED · ${job.paypal_payout_item_id ?? "stored"}. Studio keeps ${formatUsd(job.studio_amount)}.`
           : "Maya is paid only after the capture webhook.",

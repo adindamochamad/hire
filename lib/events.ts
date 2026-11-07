@@ -91,55 +91,77 @@ export async function storeVerifiedEvent(rawBody: string): Promise<{
   }
 
   const resource = asRecord(event.resource);
-  const job =
-    eventType === "PAYMENT.CAPTURE.COMPLETED"
-      ? await findJobForCapture(resource)
-      : eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED"
-        ? await findJobForPayout(resource)
-        : null;
-
-  await pool.query(
+  const inserted = await pool.query<{ id: string }>(
     `insert into paypal_events (id, event_type, resource_id, job_id, payload)
      values ($1, $2, $3, $4, $5::jsonb)
-     on conflict (id) do nothing`,
+     on conflict (id) do nothing
+     returning id`,
     [
       eventId,
       eventType,
       captureId(resource) ?? payoutItemId(resource),
-      job?.id ?? null,
+      null,
       rawBody,
     ],
   );
-
-  if (eventType === "PAYMENT.CAPTURE.COMPLETED" && job) {
-    await onCaptureCompleted(job, resource);
+  if (inserted.rowCount === 0) {
+    const existing = await pool.query<{ job_id: string | null }>(
+      "select job_id from paypal_events where id = $1",
+      [eventId],
+    );
+    return { eventId, eventType, jobId: existing.rows[0]?.job_id ?? null };
   }
-  if (eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED" && job) {
-    await onPayoutSucceeded(job, resource);
+
+  let jobId: string | null = null;
+  if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
+    const job = await findJobForCapture(resource);
+    if (job && (await onCaptureCompleted(job, resource))) {
+      jobId = job.id;
+    }
+  }
+  if (eventType === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED") {
+    const job = await findJobForPayout(resource);
+    if (job && (await onPayoutSucceeded(job, resource))) {
+      jobId = job.id;
+    }
+  }
+  if (jobId) {
+    await pool.query("update paypal_events set job_id = $2 where id = $1 and job_id is null", [
+      eventId,
+      jobId,
+    ]);
   }
 
-  return { eventId, eventType, jobId: job?.id ?? null };
+  return { eventId, eventType, jobId };
 }
 
-async function onCaptureCompleted(job: JobRow, resource: Record<string, unknown> | null) {
-  if (!moneyAddsUp(job)) return;
+async function onCaptureCompleted(
+  job: JobRow,
+  resource: Record<string, unknown> | null,
+): Promise<boolean> {
+  if (!moneyAddsUp(job)) return false;
   const capturedAmount = resourceAmount(resource, [
     ["amount"],
     ["seller_receivable_breakdown", "gross_amount"],
   ]);
-  if (capturedAmount.value !== asMoney(job.client_amount) || capturedAmount.currency !== "USD") return;
+  if (capturedAmount.value !== asMoney(job.client_amount) || capturedAmount.currency !== "USD") {
+    return false;
+  }
   const id = captureId(resource);
   const orderId = captureOrderId(resource);
+  if (!id || !orderId || orderId !== job.paypal_order_id) return false;
   await pool.query(
     `update jobs
-     set paypal_capture_id = coalesce(paypal_capture_id, $2),
-         paypal_order_id = coalesce(paypal_order_id, $3)
-     where id = $1`,
+     set paypal_capture_id = coalesce(paypal_capture_id, $2)
+     where id = $1
+       and paypal_order_id = $3
+       and paypal_capture_id is null`,
     [job.id, id, orderId],
   );
 
   const fresh = await getJob(job.id);
-  if (!fresh || fresh.paypal_payout_batch_id || fresh.paypal_payout_item_id) return;
+  if (!fresh?.paypal_capture_id) return false;
+  if (fresh.paypal_payout_batch_id || fresh.paypal_payout_item_id) return true;
 
   const email = process.env.PAYPAL_MAYA_EMAIL;
   if (!email) throw new Error("PAYPAL_MAYA_EMAIL missing");
@@ -152,16 +174,24 @@ async function onCaptureCompleted(job: JobRow, resource: Record<string, unknown>
     `update jobs set paypal_payout_batch_id = $2 where id = $1 and paypal_payout_batch_id is null`,
     [fresh.id, asString(batch?.payout_batch_id)],
   );
+  return true;
 }
 
-async function onPayoutSucceeded(job: JobRow, resource: Record<string, unknown> | null) {
+async function onPayoutSucceeded(
+  job: JobRow,
+  resource: Record<string, unknown> | null,
+): Promise<boolean> {
+  if (!job.paypal_capture_id) return false;
   const paid = resourceAmount(resource, [["payout_item", "amount"], ["amount"]]);
-  if (paid.value !== asMoney(job.maya_amount) || (paid.currency && paid.currency !== "USD")) return;
+  if (paid.value !== asMoney(job.maya_amount) || paid.currency !== "USD") return false;
+  const itemId = payoutItemId(resource);
+  if (!itemId) return false;
   await pool.query(
     `update jobs
      set paypal_payout_item_id = coalesce(paypal_payout_item_id, $2),
          paypal_payout_batch_id = coalesce(paypal_payout_batch_id, $3)
      where id = $1`,
-    [job.id, payoutItemId(resource), payoutBatchId(resource)],
+    [job.id, itemId, payoutBatchId(resource)],
   );
+  return true;
 }

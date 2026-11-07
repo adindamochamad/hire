@@ -4,10 +4,10 @@ Sesi baru di folder `hire/`. Jangan andalkan chat sebelumnya. README akar berbah
 
 ## Sekarang
 
-- Stage **2**. Capture, payout, webhook, draf model, dan halaman job **lulus** lokal.
-- Job yang membuktikan alur UI + uang lokal: **`hire-job-3`** (Complete).
-- `/` masih membuka contoh `hire-job-5`. Tombol **New Job** membuat id unik supaya juri tidak memakai `PayPal-Request-Id` yang sudah terbakar.
-- Deadline: **13 Nov 2026, 03:00 WIB**. Video dan teks Devpost dikunci **12 Nov 2026, 18:00 WIB**.
+- Stage **2 → 3 prep**. Audit Grok v3 (**CONDITIONAL**, 7 Nov ~10:24–10:26 WIB): custom split + draft + agree + sandbox **order** lulus; capture/payout **blocked** (buyer login). Live **belum** SHA `128de31` — `/` masih 307 ke `hire-job-5` (`x-nextjs-cache: HIT`), PATCH `2000/0/2000` masih **200**. Recheck 10:35 WIB sama.
+- Setiap demo: mulai dari **New Job**, jangan seed. Jangan klaim paid tanpa `paypal_capture_id` / `paypal_payout_item_id`.
+- Job bukti lokal: **`hire-job-3`**. Prompt: `docs/grok-audit-prompt.md`. Hasil: `audit-demo-v3.md`.
+- Deadline: **13 Nov 2026, 03:00 WIB**. Video/Devpost **setelah** live SHA baru + satu run buyer sandbox.
 
 ## Bukti uang (sandbox, lokal)
 

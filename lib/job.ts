@@ -74,10 +74,9 @@ export function hasPayoutEvent(events: PaypalEventPayload[]): boolean {
   return events.some((event) => event.event_type === "PAYMENT.PAYOUTS-ITEM.SUCCEEDED");
 }
 
-export function jobStatus(job: JobPayload, events: PaypalEventPayload[]): JobStatus {
-  const payoutConfirmed = hasPayoutEvent(events) && Boolean(job.paypal_payout_item_id);
-  if (payoutConfirmed) return "complete";
-  if (hasCaptureEvent(events)) return "paying_maya";
+export function jobStatus(job: JobPayload, _events?: PaypalEventPayload[]): JobStatus {
+  if (job.paypal_payout_item_id) return "complete";
+  if (job.paypal_capture_id) return "paying_maya";
   const amountsOk = amountsAddUp(job.client_amount, job.maya_amount, job.studio_amount);
   if (job.client_agreed_at && job.maya_agreed_at && amountsOk) return "awaiting_payment";
   if (job.work_summary && amountsOk) return "awaiting_agreement";
