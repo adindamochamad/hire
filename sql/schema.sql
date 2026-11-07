@@ -20,8 +20,11 @@ CREATE TABLE IF NOT EXISTS paypal_events (
   resource_id TEXT,
   job_id TEXT REFERENCES jobs (id),
   payload JSONB NOT NULL,
-  received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  processed_at TIMESTAMPTZ
 );
+
+ALTER TABLE paypal_events ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
 
 INSERT INTO jobs (id, work_summary, client_amount, maya_amount, studio_amount)
 VALUES
