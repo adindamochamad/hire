@@ -17,9 +17,6 @@ CREATE TABLE IF NOT EXISTS jobs (
       client_amount IS NOT NULL
       AND maya_amount IS NOT NULL
       AND studio_amount IS NOT NULL
-      AND client_amount > 0
-      AND maya_amount > 0
-      AND studio_amount > 0
       AND client_amount = maya_amount + studio_amount
     )
   )
@@ -52,12 +49,9 @@ ALTER TABLE jobs ADD CONSTRAINT money_splits CHECK (
     client_amount IS NOT NULL
     AND maya_amount IS NOT NULL
     AND studio_amount IS NOT NULL
-    AND client_amount > 0
-    AND maya_amount > 0
-    AND studio_amount > 0
     AND client_amount = maya_amount + studio_amount
   )
-);
+) NOT VALID;
 
 CREATE TABLE IF NOT EXISTS ai_runs (
   id TEXT PRIMARY KEY,
