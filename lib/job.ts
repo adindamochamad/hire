@@ -5,9 +5,9 @@ import { amountsAddUp } from "./money";
 export type JobPayload = {
   id: string;
   work_summary: string | null;
-  client_amount: string;
-  maya_amount: string;
-  studio_amount: string;
+  client_amount: string | null;
+  maya_amount: string | null;
+  studio_amount: string | null;
   client_agreed_at: string | null;
   maya_agreed_at: string | null;
   paypal_order_id: string | null;
@@ -66,9 +66,9 @@ export function serializeJob(job: JobRow): JobPayload {
   return {
     id: job.id,
     work_summary: job.work_summary,
-    client_amount: job.client_amount,
-    maya_amount: job.maya_amount,
-    studio_amount: job.studio_amount,
+    client_amount: job.client_amount == null ? null : String(job.client_amount),
+    maya_amount: job.maya_amount == null ? null : String(job.maya_amount),
+    studio_amount: job.studio_amount == null ? null : String(job.studio_amount),
     client_agreed_at: iso(job.client_agreed_at),
     maya_agreed_at: iso(job.maya_agreed_at),
     paypal_order_id: job.paypal_order_id,

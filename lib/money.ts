@@ -15,10 +15,11 @@ function toCents(value: string): number | null {
 }
 
 export function amountsAddUp(
-  clientAmount: string,
-  mayaAmount: string,
-  studioAmount: string,
+  clientAmount: string | null | undefined,
+  mayaAmount: string | null | undefined,
+  studioAmount: string | null | undefined,
 ): boolean {
+  if (!clientAmount || !mayaAmount || !studioAmount) return false;
   const client = toCents(clientAmount);
   const maya = toCents(mayaAmount);
   const studio = toCents(studioAmount);
@@ -32,6 +33,11 @@ export function formatUsd(value: string | number): string {
     style: "currency",
     currency: "USD",
   }).format(Number(value));
+}
+
+export function usdLabel(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  return formatUsd(value);
 }
 
 export function splitCopy(

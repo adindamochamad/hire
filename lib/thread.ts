@@ -39,25 +39,19 @@ export const BACKUP_THREAD: ThreadMessage[] = [
     id: "b1",
     party: "studio",
     name: "Studio",
-    body: "Homepage for the studio, two revision passes. Bill the client one thousand two hundred dollars.",
+    body: "Landing page, two rounds of revision. Bill the client $1,200.",
   },
   {
     id: "b2",
     party: "maya",
     name: "Maya",
-    body: "Interface work is mine. Send eight hundred my way.",
+    body: "I'll take the UI. My share is $800.",
   },
   {
     id: "b3",
     party: "client",
     name: "Client",
-    body: "Deal. I pay $1,200. Maya is owed $800. The leftover $400 stays with the studio.",
-  },
-  {
-    id: "b4",
-    party: "studio",
-    name: "Studio",
-    body: "Write those three figures on the agreement, then open PayPal.",
+    body: "My budget is $1,000.",
   },
 ];
 

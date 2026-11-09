@@ -1,4 +1,9 @@
-import { validateEvidence, type AgreementEvidence } from "@/lib/agreement";
+import {
+  unresolvedConflicts,
+  validateEvidence,
+  type AgreementEvidence,
+  type DraftOutcome,
+} from "@/lib/agreement";
 import { draftWithModel, type DraftAttempt } from "@/lib/draft-model";
 import { getJob, insertAiRun, listJobMessages, pool } from "@/lib/db";
 import { serializeAiRun, serializeJob } from "@/lib/job";
@@ -58,7 +63,19 @@ export async function POST(
 
   const messages = await listJobMessages(id);
   const attempt = await draftWithModel(messages, id);
-  const outcome = attempt.outcome;
+  let outcome: DraftOutcome = attempt.outcome;
+  const conflicts = unresolvedConflicts(messages);
+  if (outcome.status === "ready" && conflicts.length > 0) {
+    outcome = {
+      status: "needs_clarification",
+      workSummary: outcome.workSummary,
+      clientAmount: null,
+      mayaAmount: null,
+      studioAmount: null,
+      evidence: outcome.evidence,
+      questions: conflicts,
+    };
+  }
   await insertAiRun({
     jobId: id,
     model: attempt.model,
@@ -102,6 +119,9 @@ export async function POST(
            agreement_status = 'needs_clarification',
            agreement_evidence = $3::jsonb,
            draft_source = $4,
+           client_amount = null,
+           maya_amount = null,
+           studio_amount = null,
            client_agreed_at = null,
            maya_agreed_at = null
        where id = $1

@@ -50,6 +50,9 @@ export async function markAgreementDrift(job: JobRow): Promise<void> {
     `update jobs
      set agreement_version = $2,
          agreement_status = 'needs_clarification',
+         client_amount = null,
+         maya_amount = null,
+         studio_amount = null,
          client_agreed_at = null,
          maya_agreed_at = null,
          draft_source = null

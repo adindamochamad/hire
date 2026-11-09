@@ -397,6 +397,14 @@ export function readAgreementFromMessages(messages: JobMessageRow[]): DraftOutco
   };
 }
 
+export function unresolvedConflicts(messages: JobMessageRow[]): string[] {
+  const outcome = readAgreementFromMessages(messages);
+  if (outcome.status !== "needs_clarification") return [];
+  return outcome.questions.filter((question) =>
+    /without a clear acceptance|more than one|Which scope/i.test(question),
+  );
+}
+
 export function messageMap(messages: JobMessageRow[]): Map<string, JobMessageRow> {
   return new Map(messages.map((m) => [m.id, m]));
 }

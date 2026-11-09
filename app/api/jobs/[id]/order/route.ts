@@ -21,6 +21,9 @@ export async function POST(
   }
 
   void request;
+  if (!job.client_amount) {
+    return Response.json({ error: "stored amounts do not add up" }, { status: 422 });
+  }
   const createOrder = options?.createClientOrder ?? createClientOrder;
   const created = await createOrder(job.id, job.client_amount, job.work_summary);
   if (!created.ok) {

@@ -259,6 +259,7 @@ async function onCaptureCompleted(
   try {
     const email = process.env.PAYPAL_MAYA_EMAIL;
     if (!email) throw new Error("PAYPAL_MAYA_EMAIL missing");
+    if (!locked.maya_amount || !locked.client_amount) return "rejected";
     const paid = await payoutMayaFn(locked.id, locked.maya_amount, locked.client_amount, email);
     if (!paid.ok) {
       throw new Error(`payout failed ${paid.status} ${paid.debugId} ${paid.raw}`);

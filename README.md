@@ -10,20 +10,18 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 Live (Render): [https://hire-brjt.onrender.com](https://hire-brjt.onrender.com)
 
-The sections below describe this repository. The hosted app matches them after the next deploy.
-
 The home page opens a **new job** (unique PayPal request ids) so each reviewer can start clean.
 
 ## What it does
 
 1. Notes are stored per job. **Draft agreement from notes** calls Claude (`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`) through `POST https://api.anthropic.com/v1/messages` and the `submit_draft` tool. The tool returns a work summary, three amounts, a quote (`messageId` + exact text) for each figure, or clarification questions. The studio remainder may be calculated as client minus Maya. The server rejects a quote that is not in `job_messages`, then asks the model once more. If it still cannot cite, the job stays `needs_clarification` and the PayPal amounts on the row are not replaced. Each run is stored in `ai_runs` (model, latency, token counts, validation) and shown on the page. A new note that names a different amount after someone has agreed clears both agreements until the next draft is accepted.
-2. Maya and the client agree on the stored numbers. Agreement and order are refused until `agreement_status` is `ready` and `agreement_version` is at least 1. The page hides the seed split until then.
+2. Maya and the client agree on the stored numbers. Agreement and order are refused until `agreement_status` is `ready` and `agreement_version` is at least 1. A new job stores no PayPal amounts until that draft. Ambiguous notes stay `needs_clarification`. A later note with a new dollar amount is agreement drift and clears both agreements.
 3. After both parties agree, the server calls PayPal Agent Toolkit `create_order` with `jobs.client_amount`. The model does not pass the amount. `PayPal-Request-Id` is `${jobId}-order`.
 4. After the client approves, the server captures with Agent Toolkit `pay_order`.
 5. Only after a verified `PAYMENT.CAPTURE.COMPLETED` webhook, and only if the capture is the stored order for the stored client amount, does the server send a Payouts v1 payment of `jobs.maya_amount` to Maya’s sandbox email. The toolkit has no payouts tool.
 6. `PAYMENT.PAYOUTS-ITEM.SUCCEEDED` closes Maya’s share when the payout item amount matches. The job still shows the studio remainder.
 
-The seed split stored for a new job is client **$1,200**, Maya **$800**, studio **$400**. Those numbers stay off the page until a cited draft is ready. Copy then reads the stored fields. Client, Maya, and studio amounts must each be greater than zero.
+The demo thread that produces a cited draft is client **$1,200**, Maya **$800**, studio **$400**. A new job row stores no amounts until that draft is ready. Copy then reads the stored fields. Client, Maya, and studio amounts must each be greater than zero.
 
 ```mermaid
 flowchart LR
@@ -57,7 +55,7 @@ Sandbox only (`https://api-m.sandbox.paypal.com`).
 ## Try the sandbox
 
 1. Open the live URL. It creates a new job. If the first request is slow, wait; a keep-alive hits `/api/health`.
-2. Add notes, including ambiguous figures if you want, then **Draft agreement from notes**.
+2. Use **Example** for a cited $1,200 / $800 / $400 draft, or **Ambiguous example** for two client prices that stay `needs_clarification`. Then **Draft agreement from notes**. After both parties agree, a note with a new dollar amount is agreement drift.
 3. Record Maya and client agreement.
 4. Pay with a PayPal **sandbox** buyer account. This repo does not ship buyer passwords.
 5. Capture, then wait for the capture webhook and Maya’s payout item id.
@@ -72,7 +70,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Tests: `npm run test:webhooks` (13 cases), `npm run test:agreement` (10 cases). Requires local Postgres with `DATABASE_URL`.
+Tests: `npm run test:webhooks` (13 cases), `npm run test:agreement` (17 cases). Requires local Postgres with `DATABASE_URL`.
 
 Open [http://127.0.0.1:3000/](http://127.0.0.1:3000/).
 

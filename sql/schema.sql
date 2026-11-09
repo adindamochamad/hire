@@ -1,9 +1,9 @@
 CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY,
   work_summary TEXT,
-  client_amount NUMERIC(10, 2) NOT NULL,
-  maya_amount NUMERIC(10, 2) NOT NULL,
-  studio_amount NUMERIC(10, 2) NOT NULL,
+  client_amount NUMERIC(10, 2),
+  maya_amount NUMERIC(10, 2),
+  studio_amount NUMERIC(10, 2),
   client_agreed_at TIMESTAMPTZ,
   maya_agreed_at TIMESTAMPTZ,
   paypal_order_id TEXT,
@@ -11,7 +11,18 @@ CREATE TABLE IF NOT EXISTS jobs (
   paypal_payout_batch_id TEXT,
   paypal_payout_item_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT money_splits CHECK (client_amount = maya_amount + studio_amount)
+  CONSTRAINT money_splits CHECK (
+    (client_amount IS NULL AND maya_amount IS NULL AND studio_amount IS NULL)
+    OR (
+      client_amount IS NOT NULL
+      AND maya_amount IS NOT NULL
+      AND studio_amount IS NOT NULL
+      AND client_amount > 0
+      AND maya_amount > 0
+      AND studio_amount > 0
+      AND client_amount = maya_amount + studio_amount
+    )
+  )
 );
 
 CREATE TABLE IF NOT EXISTS paypal_events (
@@ -30,6 +41,23 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS agreement_version INTEGER NOT NULL DEF
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS agreement_status TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS agreement_evidence JSONB;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS draft_source TEXT;
+
+ALTER TABLE jobs ALTER COLUMN client_amount DROP NOT NULL;
+ALTER TABLE jobs ALTER COLUMN maya_amount DROP NOT NULL;
+ALTER TABLE jobs ALTER COLUMN studio_amount DROP NOT NULL;
+ALTER TABLE jobs DROP CONSTRAINT IF EXISTS money_splits;
+ALTER TABLE jobs ADD CONSTRAINT money_splits CHECK (
+  (client_amount IS NULL AND maya_amount IS NULL AND studio_amount IS NULL)
+  OR (
+    client_amount IS NOT NULL
+    AND maya_amount IS NOT NULL
+    AND studio_amount IS NOT NULL
+    AND client_amount > 0
+    AND maya_amount > 0
+    AND studio_amount > 0
+    AND client_amount = maya_amount + studio_amount
+  )
+);
 
 CREATE TABLE IF NOT EXISTS ai_runs (
   id TEXT PRIMARY KEY,
@@ -72,18 +100,6 @@ CREATE TABLE IF NOT EXISTS agreement_revisions (
 
 INSERT INTO jobs (id, work_summary, client_amount, maya_amount, studio_amount)
 VALUES
-  (
-    'hire-job-1',
-    'Landing page, two rounds of revision',
-    1200.00,
-    800.00,
-    400.00
-  ),
-  (
-    'hire-job-5',
-    'Landing page, two rounds of revision',
-    1200.00,
-    800.00,
-    400.00
-  )
+  ('hire-job-1', null, null, null, null),
+  ('hire-job-5', null, null, null, null)
 ON CONFLICT (id) DO NOTHING;

@@ -33,9 +33,9 @@ export const pool = new Proxy({} as Pool, {
 export type JobRow = {
   id: string;
   work_summary: string | null;
-  client_amount: string;
-  maya_amount: string;
-  studio_amount: string;
+  client_amount: string | null;
+  maya_amount: string | null;
+  studio_amount: string | null;
   client_agreed_at: Date | null;
   maya_agreed_at: Date | null;
   paypal_order_id: string | null;
@@ -139,7 +139,7 @@ export async function insertJob(): Promise<JobRow> {
   const id = `hire-${crypto.randomUUID()}`;
   const saved = await pool.query<JobRow>(
     `insert into jobs (id, work_summary, client_amount, maya_amount, studio_amount)
-     values ($1, null, 1200.00, 800.00, 400.00)
+     values ($1, null, null, null, null)
      returning *`,
     [id],
   );

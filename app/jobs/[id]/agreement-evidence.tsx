@@ -1,6 +1,6 @@
 import type { AgreementEvidence, FieldEvidence } from "@/lib/agreement";
 import { moneyVisible, type JobPayload } from "@/lib/job";
-import { formatUsd } from "@/lib/money";
+import { usdLabel } from "@/lib/money";
 
 type Props = {
   job: JobPayload;
@@ -89,21 +89,21 @@ export function AgreementEvidencePanel({ job, onViewSource }: Props) {
       />
       <FieldRow
         label="Client pays"
-        value={showMoney ? formatUsd(job.client_amount) : "—"}
+        value={usdLabel(showMoney ? job.client_amount : null)}
         field={evidence.clientAmount}
         needsClarify={needsClarify && !evidence.clientAmount}
         onViewSource={onViewSource}
       />
       <FieldRow
         label="Maya receives"
-        value={showMoney ? formatUsd(job.maya_amount) : "—"}
+        value={usdLabel(showMoney ? job.maya_amount : null)}
         field={evidence.mayaAmount}
         needsClarify={needsClarify && !evidence.mayaAmount}
         onViewSource={onViewSource}
       />
       <FieldRow
         label="Studio keeps"
-        value={showMoney ? formatUsd(job.studio_amount) : "—"}
+        value={usdLabel(showMoney ? job.studio_amount : null)}
         field={evidence.studioAmount}
         needsClarify={needsClarify && !evidence.studioAmount}
         onViewSource={onViewSource}

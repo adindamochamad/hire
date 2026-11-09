@@ -11,7 +11,7 @@ import {
   type JobPayload,
   type PaypalEventPayload,
 } from "@/lib/job";
-import { amountsAddUp, formatUsd, splitCopy } from "@/lib/money";
+import { amountsAddUp, formatUsd, splitCopy, usdLabel } from "@/lib/money";
 import { BACKUP_THREAD, DEMO_THREAD, type ThreadMessage } from "@/lib/thread";
 import { AgreementEvidencePanel } from "./agreement-evidence";
 
@@ -64,8 +64,8 @@ function formatWhen(value: string | null): string {
   });
 }
 
-function blankUnlessVisible(job: JobPayload, amount: string): string {
-  return moneyVisible(job) ? amount : "";
+function blankUnlessVisible(job: JobPayload, amount: string | null): string {
+  return moneyVisible(job) && amount ? amount : "";
 }
 
 export function JobPortal({
@@ -403,7 +403,7 @@ export function JobPortal({
             </label>
           )}
           <p className="lede">
-            {showMoney
+            {showMoney && job.client_amount && job.maya_amount && job.studio_amount
               ? splitCopy(job.client_amount, job.maya_amount, job.studio_amount)
               : "Client, Maya, and studio amounts appear after a draft the server can cite."}
           </p>
@@ -428,15 +428,15 @@ export function JobPortal({
             <dl className="sheet-money">
               <div>
                 <dt>Client pays</dt>
-                <dd>{formatUsd(clientAmount)}</dd>
+                <dd>{usdLabel(clientAmount)}</dd>
               </div>
               <div>
                 <dt>Maya receives</dt>
-                <dd>{formatUsd(mayaAmount)}</dd>
+                <dd>{usdLabel(mayaAmount)}</dd>
               </div>
               <div>
                 <dt>Studio keeps</dt>
-                <dd>{formatUsd(studioAmount)}</dd>
+                <dd>{usdLabel(studioAmount)}</dd>
               </div>
             </dl>
           ) : (
@@ -499,7 +499,7 @@ export function JobPortal({
                       <div>
                         <dt>Client pays</dt>
                         <dd>
-                          <span className="diff-old">{showMoney ? formatUsd(job.client_amount) : "—"}</span>
+                          <span className="diff-old">{usdLabel(showMoney ? job.client_amount : null)}</span>
                           <span className="diff-arrow">→</span>
                           <span className="diff-new">{formatUsd(clientAmount)}</span>
                         </dd>
@@ -509,7 +509,7 @@ export function JobPortal({
                       <div>
                         <dt>Maya receives</dt>
                         <dd>
-                          <span className="diff-old">{showMoney ? formatUsd(job.maya_amount) : "—"}</span>
+                          <span className="diff-old">{usdLabel(showMoney ? job.maya_amount : null)}</span>
                           <span className="diff-arrow">→</span>
                           <span className="diff-new">{formatUsd(mayaAmount)}</span>
                         </dd>
@@ -519,7 +519,7 @@ export function JobPortal({
                       <div>
                         <dt>Studio keeps</dt>
                         <dd>
-                          <span className="diff-old">{showMoney ? formatUsd(job.studio_amount) : "—"}</span>
+                          <span className="diff-old">{usdLabel(showMoney ? job.studio_amount : null)}</span>
                           <span className="diff-arrow">→</span>
                           <span className="diff-new">{formatUsd(studioAmount)}</span>
                         </dd>
@@ -609,8 +609,10 @@ export function JobPortal({
                   disabled={locked || busy !== "idle"}
                   onClick={() => {
                     void run("note", async () => {
+                      if (thread.length > 0) {
+                        throw new Error("Start a new job before loading another example.");
+                      }
                       setScript("main");
-                      setThread([]);
                       await seedStarterMessages(DEMO_THREAD);
                     });
                   }}
@@ -623,8 +625,10 @@ export function JobPortal({
                   disabled={locked || busy !== "idle"}
                   onClick={() => {
                     void run("note", async () => {
+                      if (thread.length > 0) {
+                        throw new Error("Start a new job before loading another example.");
+                      }
                       setScript("backup");
-                      setThread([]);
                       await seedStarterMessages(BACKUP_THREAD);
                     });
                   }}
@@ -634,6 +638,11 @@ export function JobPortal({
                 </button>
               </div>
             </div>
+            <p className="lede">
+              Example cites $1,200 / $800 / $400. Ambiguous example leaves a $1,200 studio quote
+              and a $1,000 client budget unresolved. After both parties agree, a note with a new
+              dollar amount is agreement drift and PayPal stays locked.
+            </p>
             <div className="thread">
               {thread.length === 0 ? (
                 <div className="empty-state">
@@ -720,15 +729,15 @@ export function JobPortal({
               <div className="split">
               <div className="split-row">
                 <span className="label">Client pays</span>
-                <span className="amount">{showMoney ? formatUsd(job.client_amount) : "—"}</span>
+                <span className="amount">{usdLabel(showMoney ? job.client_amount : null)}</span>
               </div>
               <div className="split-row">
                 <span className="label">Maya receives</span>
-                <span className="amount">{showMoney ? formatUsd(job.maya_amount) : "—"}</span>
+                <span className="amount">{usdLabel(showMoney ? job.maya_amount : null)}</span>
               </div>
               <div className="split-row studio">
                 <span className="label">Studio keeps</span>
-                <span className="amount">{showMoney ? formatUsd(job.studio_amount) : "—"}</span>
+                <span className="amount">{usdLabel(showMoney ? job.studio_amount : null)}</span>
               </div>
             </div>
           </section>
@@ -764,9 +773,9 @@ export function JobPortal({
             </p>
             {captureDone ? (
               <p className="settled">
-                Client paid {formatUsd(job.client_amount)}. Capture {job.paypal_capture_id}.
+                Client paid {usdLabel(job.client_amount)}. Capture {job.paypal_capture_id}.
                 {payoutDone
-                  ? ` Maya received ${formatUsd(job.maya_amount)}. Payout item ${job.paypal_payout_item_id}. Studio keeps ${formatUsd(job.studio_amount)}.`
+                  ? ` Maya received ${usdLabel(job.maya_amount)}. Payout item ${job.paypal_payout_item_id}. Studio keeps ${usdLabel(job.studio_amount)}.`
                   : " Waiting on Maya's payout item id."}
               </p>
             ) : (
@@ -779,13 +788,13 @@ export function JobPortal({
                 >
                   {busy === "order"
                     ? "Opening PayPal…"
-                    : showMoney
+                    : showMoney && job.client_amount
                       ? `Pay ${formatUsd(job.client_amount)} on PayPal`
                       : "Pay on PayPal"}
                 </button>
                 {approveUrl ? (
                   <a className="paypal-link" href={approveUrl} rel="noreferrer" target="_blank">
-                    Open PayPal to approve {showMoney ? formatUsd(job.client_amount) : "the stored amount"}
+                    Open PayPal to approve {usdLabel(showMoney ? job.client_amount : null)}
                   </a>
                 ) : null}
                 {job.paypal_order_id ? (

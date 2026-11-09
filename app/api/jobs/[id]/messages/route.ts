@@ -34,7 +34,12 @@ export async function POST(
   const agreed = Boolean(job.client_agreed_at || job.maya_agreed_at);
   if (
     agreed &&
-    noteBreaksStoredAmounts(text, [job.client_amount, job.maya_amount, job.studio_amount])
+    noteBreaksStoredAmounts(
+      text,
+      [job.client_amount, job.maya_amount, job.studio_amount].filter(
+        (value): value is string => Boolean(value),
+      ),
+    )
   ) {
     await markAgreementDrift(job);
     const drifted = await getJob(id);

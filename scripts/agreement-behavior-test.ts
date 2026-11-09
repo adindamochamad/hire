@@ -3,6 +3,7 @@ process.env.DATABASE_URL ??= "postgres://hire:hire@127.0.0.1:5432/hire";
 import pg from "pg";
 import {
   readAgreementFromMessages,
+  unresolvedConflicts,
   validateEvidence,
   type AgreementEvidence,
 } from "../lib/agreement";
@@ -53,12 +54,12 @@ async function freshJob(id: string): Promise<void> {
   await client.query("delete from paypal_events where job_id = $1", [id]);
   await client.query(
     `insert into jobs (id, work_summary, client_amount, maya_amount, studio_amount)
-     values ($1, null, 1200.00, 800.00, 400.00)
+     values ($1, null, null, null, null)
      on conflict (id) do update set
        work_summary = null,
-       client_amount = 1200.00,
-       maya_amount = 800.00,
-       studio_amount = 400.00,
+       client_amount = null,
+       maya_amount = null,
+       studio_amount = null,
        client_agreed_at = null,
        maya_agreed_at = null,
        paypal_order_id = null,
@@ -262,6 +263,9 @@ async function main() {
     await client.query(
       `update jobs set
          work_summary = 'Landing page',
+         client_amount = 1200.00,
+         maya_amount = 800.00,
+         studio_amount = 400.00,
          client_agreed_at = now(),
          maya_agreed_at = now(),
          agreement_status = 'ready',
@@ -372,6 +376,9 @@ async function main() {
     await client.query(
       `update jobs set
          work_summary = 'Landing page',
+         client_amount = 1200.00,
+         maya_amount = 800.00,
+         studio_amount = 400.00,
          agreement_status = 'ready',
          agreement_version = 1,
          client_agreed_at = now(),
@@ -392,6 +399,9 @@ async function main() {
     );
     if (!JSON.stringify(questions.rows[0]?.clarification_questions).includes("Agreement drift")) {
       throw new Error("missing drift question");
+    }
+    if (after.client_amount || after.maya_amount || after.studio_amount) {
+      throw new Error("amounts should be cleared on drift");
     }
   });
 
@@ -438,6 +448,28 @@ async function main() {
     if (attempt.outcome.studioAmount !== "400.00") throw new Error(attempt.outcome.studioAmount);
     if (attempt.outcome.evidence.studioAmount?.kind !== "calculated") throw new Error("studio evidence");
     if (attempt.inputTokens !== 20 || attempt.outputTokens !== 15) throw new Error("tokens");
+  });
+
+  await run("16. New job has no seed amounts", async () => {
+    const jobId = "agr-test-16";
+    await freshJob(jobId);
+    const job = (await client.query("select * from jobs where id = $1", [jobId])).rows[0];
+    if (job.client_amount || job.maya_amount || job.studio_amount) {
+      throw new Error("seed amounts present");
+    }
+    const eligible = orderEligibility(job);
+    if (eligible.ok) throw new Error("empty job ordered");
+  });
+
+  await run("17. Conflicting client prices stay unresolved", async () => {
+    const messages = [
+      msg("x1", "agr-conflict", "studio", "Landing page, two rounds of revision. Bill the client $1,200."),
+      msg("x2", "agr-conflict", "maya", "I'll take the UI. My share is $800."),
+      msg("x3", "agr-conflict", "client", "My budget is $1,000."),
+    ];
+    if (unresolvedConflicts(messages).length === 0) throw new Error("expected conflict");
+    const parsed = readAgreementFromMessages(messages);
+    if (parsed.status !== "needs_clarification") throw new Error(parsed.status);
   });
 
   await client.end();
