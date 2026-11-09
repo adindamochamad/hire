@@ -1,10 +1,7 @@
-import {
-  readAgreementFromMessages,
-  validateEvidence,
-  type AgreementEvidence,
-} from "@/lib/agreement";
-import { getJob, listJobMessages, pool } from "@/lib/db";
-import { serializeJob } from "@/lib/job";
+import { validateEvidence, type AgreementEvidence } from "@/lib/agreement";
+import { draftWithModel, type DraftAttempt } from "@/lib/draft-model";
+import { getJob, insertAiRun, listJobMessages, pool } from "@/lib/db";
+import { serializeAiRun, serializeJob } from "@/lib/job";
 import { amountsAddUp } from "@/lib/money";
 
 async function saveRevision(
@@ -60,7 +57,17 @@ export async function POST(
   }
 
   const messages = await listJobMessages(id);
-  const outcome = readAgreementFromMessages(messages);
+  const attempt = await draftWithModel(messages, id);
+  const outcome = attempt.outcome;
+  await insertAiRun({
+    jobId: id,
+    model: attempt.model,
+    latencyMs: attempt.latencyMs,
+    inputTokens: attempt.inputTokens,
+    outputTokens: attempt.outputTokens,
+    validation: attempt.validation,
+  });
+  const draftSource = attempt.validation === "pass" || attempt.validation === "parser_fallback" ? attempt.source : null;
 
   const validationError = validateEvidence(
     outcome.evidence,
@@ -94,15 +101,17 @@ export async function POST(
        set agreement_version = $2,
            agreement_status = 'needs_clarification',
            agreement_evidence = $3::jsonb,
+           draft_source = $4,
            client_agreed_at = null,
            maya_agreed_at = null
        where id = $1
        returning *`,
-      [id, nextVersion, JSON.stringify(outcome.evidence)],
+      [id, nextVersion, JSON.stringify(outcome.evidence), draftSource],
     );
     return Response.json({
       job: serializeJob(saved.rows[0]),
       draft: outcome,
+      aiRun: serializeAiRun(aiRunFromAttempt(attempt)),
     });
   }
 
@@ -135,6 +144,7 @@ export async function POST(
          agreement_version = $6,
          agreement_status = 'ready',
          agreement_evidence = $7::jsonb,
+         draft_source = $8,
          client_agreed_at = null,
          maya_agreed_at = null
      where id = $1
@@ -147,8 +157,24 @@ export async function POST(
       outcome.studioAmount,
       nextVersion,
       JSON.stringify(outcome.evidence),
+      draftSource,
     ],
   );
 
-  return Response.json({ job: serializeJob(saved.rows[0]), draft: outcome });
+  return Response.json({
+    job: serializeJob(saved.rows[0]),
+    draft: outcome,
+    aiRun: serializeAiRun(aiRunFromAttempt(attempt)),
+  });
+}
+
+function aiRunFromAttempt(attempt: DraftAttempt) {
+  return {
+    model: attempt.model,
+    latency_ms: attempt.latencyMs,
+    input_tokens: attempt.inputTokens,
+    output_tokens: attempt.outputTokens,
+    validation: attempt.validation,
+    created_at: new Date(),
+  };
 }

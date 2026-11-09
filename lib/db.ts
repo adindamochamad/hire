@@ -45,6 +45,16 @@ export type JobRow = {
   agreement_version: number;
   agreement_status: string | null;
   agreement_evidence: unknown;
+  draft_source: string | null;
+  created_at: Date;
+};
+
+export type AiRunRow = {
+  model: string;
+  latency_ms: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  validation: "pass" | "citation_rejected" | "parser_fallback";
   created_at: Date;
 };
 
@@ -83,6 +93,41 @@ export async function insertJobMessage(
     [messageId, jobId, party, authorName, body],
   );
   return saved.rows[0];
+}
+
+export async function latestAiRun(jobId: string): Promise<AiRunRow | null> {
+  const result = await pool.query<AiRunRow>(
+    `select model, latency_ms, input_tokens, output_tokens, validation, created_at
+     from ai_runs
+     where job_id = $1
+     order by created_at desc
+     limit 1`,
+    [jobId],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function insertAiRun(input: {
+  jobId: string;
+  model: string;
+  latencyMs: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  validation: AiRunRow["validation"];
+}): Promise<void> {
+  await pool.query(
+    `insert into ai_runs (id, job_id, model, latency_ms, input_tokens, output_tokens, validation)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      `run-${crypto.randomUUID()}`,
+      input.jobId,
+      input.model,
+      input.latencyMs,
+      input.inputTokens,
+      input.outputTokens,
+      input.validation,
+    ],
+  );
 }
 
 export async function getJob(id: string): Promise<JobRow | null> {

@@ -8,3 +8,8 @@ dist
 *.pem
 tsconfig.tsbuildinfo
 .cursor/debug-*.log
+audit-demo-v*.md
+hire-retry-audit-*.md
+sandbox-e2e-production.json
+test-webhooks-*.txt
+01M6V13KDJGHC4M5D2MYGMZE6T.txt

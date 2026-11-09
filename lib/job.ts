@@ -17,6 +17,16 @@ export type JobPayload = {
   agreement_version: number;
   agreement_status: "ready" | "needs_clarification" | null;
   agreement_evidence: AgreementEvidence | null;
+  draft_source: "model" | "parser" | null;
+  created_at: string;
+};
+
+export type AiRunPayload = {
+  model: string;
+  latency_ms: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  validation: "pass" | "citation_rejected" | "parser_fallback";
   created_at: string;
 };
 
@@ -71,8 +81,31 @@ export function serializeJob(job: JobRow): JobPayload {
         ? job.agreement_status
         : null,
     agreement_evidence: parsedEvidence,
+    draft_source: job.draft_source === "model" || job.draft_source === "parser" ? job.draft_source : null,
     created_at: iso(job.created_at) ?? new Date().toISOString(),
   };
+}
+
+export function serializeAiRun(run: {
+  model: string;
+  latency_ms: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  validation: AiRunPayload["validation"];
+  created_at: Date | string;
+}): AiRunPayload {
+  return {
+    model: run.model,
+    latency_ms: Number(run.latency_ms),
+    input_tokens: run.input_tokens === null ? null : Number(run.input_tokens),
+    output_tokens: run.output_tokens === null ? null : Number(run.output_tokens),
+    validation: run.validation,
+    created_at: iso(run.created_at) ?? new Date().toISOString(),
+  };
+}
+
+export function moneyVisible(job: JobPayload): boolean {
+  return job.agreement_status === "ready" || Boolean(job.paypal_order_id);
 }
 
 export function serializeMessage(row: {
@@ -116,12 +149,10 @@ export function hasPayoutEvent(events: PaypalEventPayload[]): boolean {
 export function jobStatus(job: JobPayload, _events?: PaypalEventPayload[]): JobStatus {
   if (job.paypal_payout_item_id) return "complete";
   if (job.paypal_capture_id) return "paying_maya";
+  if (job.agreement_status !== "ready") return "drafting";
   const amountsOk = amountsAddUp(job.client_amount, job.maya_amount, job.studio_amount);
   if (job.client_agreed_at && job.maya_agreed_at && amountsOk) return "awaiting_payment";
-  if (job.agreement_status === "needs_clarification") return "drafting";
-  if (job.work_summary && amountsOk) {
-    return "awaiting_agreement";
-  }
+  if (job.work_summary && amountsOk) return "awaiting_agreement";
   return "drafting";
 }
 

@@ -29,6 +29,21 @@ ALTER TABLE paypal_events ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS agreement_version INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS agreement_status TEXT;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS agreement_evidence JSONB;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS draft_source TEXT;
+
+CREATE TABLE IF NOT EXISTS ai_runs (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL REFERENCES jobs (id) ON DELETE CASCADE,
+  model TEXT NOT NULL,
+  latency_ms INTEGER NOT NULL,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  validation TEXT NOT NULL CHECK (validation IN ('pass', 'citation_rejected', 'parser_fallback')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ai_runs_job_id_created_at_idx
+  ON ai_runs (job_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS job_messages (
   id TEXT PRIMARY KEY,

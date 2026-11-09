@@ -7,6 +7,8 @@ import {
   type AgreementEvidence,
 } from "../lib/agreement";
 import type { JobMessageRow } from "../lib/db";
+import { draftWithModel } from "../lib/draft-model";
+import { markAgreementDrift, noteBreaksStoredAmounts } from "../lib/drift";
 import { orderEligibility } from "../lib/order-eligibility";
 
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -45,6 +47,7 @@ function msg(
 }
 
 async function freshJob(id: string): Promise<void> {
+  await client.query("delete from ai_runs where job_id = $1", [id]);
   await client.query("delete from agreement_revisions where job_id = $1", [id]);
   await client.query("delete from job_messages where job_id = $1", [id]);
   await client.query("delete from paypal_events where job_id = $1", [id]);
@@ -261,7 +264,8 @@ async function main() {
          work_summary = 'Landing page',
          client_agreed_at = now(),
          maya_agreed_at = now(),
-         agreement_status = 'ready'
+         agreement_status = 'ready',
+         agreement_version = 1
        where id = $1`,
       [jobId],
     );
@@ -270,6 +274,170 @@ async function main() {
     if (!eligible.ok) throw new Error(eligible.error);
     if (job.client_amount !== "1200.00") throw new Error(`stored ${job.client_amount}`);
     void { clientAmount: "1.00" };
+  });
+
+  await run("11. Version 0 cannot be ordered", async () => {
+    const jobId = "agr-test-11";
+    await freshJob(jobId);
+    await client.query(
+      `update jobs set
+         work_summary = 'Landing page',
+         agreement_status = 'ready',
+         client_agreed_at = now(),
+         maya_agreed_at = now()
+       where id = $1`,
+      [jobId],
+    );
+    const job = (await client.query("select * from jobs where id = $1", [jobId])).rows[0];
+    const eligible = orderEligibility(job);
+    if (eligible.ok) throw new Error("version 0 was ordered");
+  });
+
+  await run("12. Fake citation is rejected", async () => {
+    const messages = [msg("e1", "agr-fake", "studio", "Client pays $1,200.")];
+    let calls = 0;
+    const attempt = await draftWithModel(messages, "agr-fake", {
+      apiKey: "test-key",
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response(
+          JSON.stringify({
+            content: [
+              {
+                type: "tool_use",
+                id: "toolu_test",
+                name: "submit_draft",
+                input: {
+                  status: "ready",
+                  workSummary: "Landing page",
+                  clientAmount: "9999.00",
+                  mayaAmount: "800.00",
+                  studioAmount: "400.00",
+                  studioKind: "quoted",
+                  questions: [],
+                  workQuote: { messageId: "e1", quote: "Client pays $1,200." },
+                  clientQuote: { messageId: "e1", quote: "$9,999" },
+                  mayaQuote: { messageId: "", quote: "" },
+                  studioQuote: { messageId: "", quote: "" },
+                },
+              },
+            ],
+            usage: { input_tokens: 11, output_tokens: 7 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    });
+    if (calls !== 2) throw new Error(`calls ${calls}`);
+    if (attempt.validation !== "citation_rejected") throw new Error(attempt.validation);
+    if (attempt.outcome.status !== "needs_clarification") throw new Error(attempt.outcome.status);
+    if (attempt.outcome.clientAmount) throw new Error("invented client amount kept");
+    if (attempt.model === "parser") throw new Error("labeled as parser");
+  });
+
+  await run("13. API failure uses a labeled parser", async () => {
+    const messages = [
+      msg("p1", "agr-parser", "studio", "Landing page, two rounds of revision. The client pays $1,200 for the job."),
+      msg("p2", "agr-parser", "maya", "I'll take the UI. My share is $800."),
+      msg("p3", "agr-parser", "client", "Confirmed. $1,200 total. Maya receives $800. The studio keeps $400."),
+    ];
+    let calls = 0;
+    const attempt = await draftWithModel(messages, "agr-parser", {
+      apiKey: "test-key",
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response("nope", { status: 500 });
+      },
+    });
+    if (calls !== 1) throw new Error(`calls ${calls}`);
+    if (attempt.validation !== "parser_fallback") throw new Error(attempt.validation);
+    if (attempt.source !== "parser" || attempt.model !== "parser") throw new Error(attempt.model);
+    if (attempt.outcome.status !== "ready" || attempt.outcome.clientAmount !== "1200.00") {
+      throw new Error(`parser ${attempt.outcome.status}`);
+    }
+  });
+
+  await run("14. Foreign amount after agreement is drift", async () => {
+    if (!noteBreaksStoredAmounts("Correction: Maya share is $750.", ["1200.00", "800.00", "400.00"])) {
+      throw new Error("expected drift");
+    }
+    if (noteBreaksStoredAmounts("Still $1,200 and $800.", ["1200.00", "800.00", "400.00"])) {
+      throw new Error("same amounts should not drift");
+    }
+    if (noteBreaksStoredAmounts("See you tomorrow.", ["1200.00", "800.00", "400.00"])) {
+      throw new Error("note without money should not drift");
+    }
+    const jobId = "agr-test-14";
+    await freshJob(jobId);
+    await client.query(
+      `update jobs set
+         work_summary = 'Landing page',
+         agreement_status = 'ready',
+         agreement_version = 1,
+         client_agreed_at = now(),
+         maya_agreed_at = now()
+       where id = $1`,
+      [jobId],
+    );
+    const before = (await client.query("select * from jobs where id = $1", [jobId])).rows[0];
+    await markAgreementDrift(before);
+    const after = (await client.query("select * from jobs where id = $1", [jobId])).rows[0];
+    if (after.client_agreed_at || after.maya_agreed_at) throw new Error("agreements not cleared");
+    if (after.agreement_status !== "needs_clarification") throw new Error(after.agreement_status);
+    const order = orderEligibility(after);
+    if (order.ok) throw new Error("order allowed after drift");
+    const questions = await client.query(
+      "select clarification_questions from agreement_revisions where job_id = $1 and version = $2",
+      [jobId, after.agreement_version],
+    );
+    if (!JSON.stringify(questions.rows[0]?.clarification_questions).includes("Agreement drift")) {
+      throw new Error("missing drift question");
+    }
+  });
+
+  await run("15. Valid cited tool input is ready", async () => {
+    const messages = [
+      msg("v1", "agr-valid", "studio", "Landing page, two rounds of revision. The client pays $1,200."),
+      msg("v2", "agr-valid", "maya", "My share is $800."),
+    ];
+    const attempt = await draftWithModel(messages, "agr-valid", {
+      apiKey: "test-key",
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            content: [
+              {
+                type: "tool_use",
+                id: "toolu_ok",
+                name: "submit_draft",
+                input: {
+                  status: "ready",
+                  workSummary: "Landing page, two rounds of revision",
+                  clientAmount: "1200.00",
+                  mayaAmount: "800.00",
+                  studioAmount: "",
+                  studioKind: "calculated",
+                  questions: [],
+                  workQuote: { messageId: "v1", quote: "Landing page, two rounds of revision" },
+                  clientQuote: { messageId: "v1", quote: "$1,200" },
+                  mayaQuote: { messageId: "v2", quote: "$800" },
+                  studioQuote: { messageId: "", quote: "" },
+                },
+              },
+            ],
+            usage: { input_tokens: 20, output_tokens: 15 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+    if (attempt.validation !== "pass" || attempt.source !== "model") throw new Error(attempt.validation);
+    if (attempt.outcome.status !== "ready") throw new Error(attempt.outcome.status);
+    if (attempt.outcome.clientAmount !== "1200.00" || attempt.outcome.mayaAmount !== "800.00") {
+      throw new Error("amounts");
+    }
+    if (attempt.outcome.studioAmount !== "400.00") throw new Error(attempt.outcome.studioAmount);
+    if (attempt.outcome.evidence.studioAmount?.kind !== "calculated") throw new Error("studio evidence");
+    if (attempt.inputTokens !== 20 || attempt.outputTokens !== 15) throw new Error("tokens");
   });
 
   await client.end();

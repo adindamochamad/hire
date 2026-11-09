@@ -11,8 +11,8 @@ export async function POST(
   if (!job) {
     return Response.json({ error: "job not found" }, { status: 404 });
   }
-  if (job.agreement_status === "needs_clarification") {
-    return Response.json({ error: "agreement needs clarification before anyone can agree" }, { status: 409 });
+  if (job.agreement_status !== "ready" || Number(job.agreement_version ?? 0) < 1) {
+    return Response.json({ error: "agreement is not ready" }, { status: 409 });
   }
   if (!job.work_summary || !amountsAddUp(job.client_amount, job.maya_amount, job.studio_amount)) {
     return Response.json({ error: "agreement is not ready" }, { status: 409 });

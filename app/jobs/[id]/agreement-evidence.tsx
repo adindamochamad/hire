@@ -1,5 +1,5 @@
 import type { AgreementEvidence, FieldEvidence } from "@/lib/agreement";
-import type { JobPayload } from "@/lib/job";
+import { moneyVisible, type JobPayload } from "@/lib/job";
 import { formatUsd } from "@/lib/money";
 
 type Props = {
@@ -71,6 +71,7 @@ function FieldRow({
 export function AgreementEvidencePanel({ job, onViewSource }: Props) {
   const evidence: AgreementEvidence = job.agreement_evidence ?? {};
   const needsClarify = job.agreement_status === "needs_clarification";
+  const showMoney = moneyVisible(job);
   if (!job.work_summary && !needsClarify && !job.agreement_evidence) return null;
 
   return (
@@ -88,21 +89,21 @@ export function AgreementEvidencePanel({ job, onViewSource }: Props) {
       />
       <FieldRow
         label="Client pays"
-        value={formatUsd(job.client_amount)}
+        value={showMoney ? formatUsd(job.client_amount) : "—"}
         field={evidence.clientAmount}
         needsClarify={needsClarify && !evidence.clientAmount}
         onViewSource={onViewSource}
       />
       <FieldRow
         label="Maya receives"
-        value={formatUsd(job.maya_amount)}
+        value={showMoney ? formatUsd(job.maya_amount) : "—"}
         field={evidence.mayaAmount}
         needsClarify={needsClarify && !evidence.mayaAmount}
         onViewSource={onViewSource}
       />
       <FieldRow
         label="Studio keeps"
-        value={formatUsd(job.studio_amount)}
+        value={showMoney ? formatUsd(job.studio_amount) : "—"}
         field={evidence.studioAmount}
         needsClarify={needsClarify && !evidence.studioAmount}
         onViewSource={onViewSource}

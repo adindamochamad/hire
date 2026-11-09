@@ -1,5 +1,6 @@
 import { getJob, insertJobMessage } from "@/lib/db";
-import { serializeMessage } from "@/lib/job";
+import { markAgreementDrift, noteBreaksStoredAmounts } from "@/lib/drift";
+import { serializeJob, serializeMessage } from "@/lib/job";
 import { asString } from "@/lib/paypal";
 
 export async function POST(
@@ -30,5 +31,21 @@ export async function POST(
   }
   const defaultNames = { studio: "Studio", maya: "Maya", client: "Client" } as const;
   const saved = await insertJobMessage(id, party, authorName ?? defaultNames[party], text);
-  return Response.json({ message: serializeMessage(saved) }, { status: 201 });
+  const agreed = Boolean(job.client_agreed_at || job.maya_agreed_at);
+  if (
+    agreed &&
+    noteBreaksStoredAmounts(text, [job.client_amount, job.maya_amount, job.studio_amount])
+  ) {
+    await markAgreementDrift(job);
+    const drifted = await getJob(id);
+    return Response.json(
+      {
+        message: serializeMessage(saved),
+        job: drifted ? serializeJob(drifted) : null,
+        drifted: true,
+      },
+      { status: 201 },
+    );
+  }
+  return Response.json({ message: serializeMessage(saved), drifted: false }, { status: 201 });
 }

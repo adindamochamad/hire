@@ -1,7 +1,8 @@
 import type { AgreementEvidence } from "@/lib/agreement";
-import { getJob, listJobMessages, pool } from "@/lib/db";
+import { getJob, latestAiRun, listJobMessages, pool } from "@/lib/db";
 import {
   agreementEditable,
+  serializeAiRun,
   serializeEvent,
   serializeJob,
   serializeMessage,
@@ -43,11 +44,13 @@ export async function GET(
       clarificationQuestions = raw.filter((item): item is string => typeof item === "string");
     }
   }
+  const aiRun = await latestAiRun(id);
   return Response.json({
     job: serializeJob(job),
     events: events.rows.map(serializeEvent) satisfies PaypalEventPayload[],
     messages: messages.map(serializeMessage),
     clarificationQuestions,
+    aiRun: aiRun ? serializeAiRun(aiRun) : null,
   });
 }
 
@@ -122,6 +125,7 @@ export async function PATCH(
          agreement_version = $6,
          agreement_status = 'ready',
          agreement_evidence = $7::jsonb,
+         draft_source = null,
          client_agreed_at = null,
          maya_agreed_at = null
      where id = $1

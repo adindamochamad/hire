@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   agreementLocked,
   jobStatus,
+  moneyVisible,
   statusLabel,
+  type AiRunPayload,
   type JobMessagePayload,
   type JobPayload,
   type PaypalEventPayload,
@@ -20,6 +22,7 @@ type Props = {
   initialEvents: PaypalEventPayload[];
   initialMessages: JobMessagePayload[];
   initialClarificationQuestions: string[];
+  initialAiRun: AiRunPayload | null;
 };
 
 function toThread(messages: JobMessagePayload[]): ThreadMessage[] {
@@ -61,11 +64,16 @@ function formatWhen(value: string | null): string {
   });
 }
 
+function blankUnlessVisible(job: JobPayload, amount: string): string {
+  return moneyVisible(job) ? amount : "";
+}
+
 export function JobPortal({
   initialJob,
   initialEvents,
   initialMessages,
   initialClarificationQuestions,
+  initialAiRun,
 }: Props) {
   const [job, setJob] = useState(initialJob);
   const [events, setEvents] = useState(initialEvents);
@@ -74,9 +82,10 @@ export function JobPortal({
     initialMessages.length > 0 ? toThread(initialMessages) : [],
   );
   const [summary, setSummary] = useState(initialJob.work_summary ?? "");
-  const [clientAmount, setClientAmount] = useState(initialJob.client_amount);
-  const [mayaAmount, setMayaAmount] = useState(initialJob.maya_amount);
-  const [studioAmount, setStudioAmount] = useState(initialJob.studio_amount);
+  const [clientAmount, setClientAmount] = useState(blankUnlessVisible(initialJob, initialJob.client_amount));
+  const [mayaAmount, setMayaAmount] = useState(blankUnlessVisible(initialJob, initialJob.maya_amount));
+  const [studioAmount, setStudioAmount] = useState(blankUnlessVisible(initialJob, initialJob.studio_amount));
+  const [aiRun, setAiRun] = useState<AiRunPayload | null>(initialAiRun);
   const [busy, setBusy] = useState<Busy>("idle");
   const [error, setError] = useState<string | null>(null);
   const [approveUrl, setApproveUrl] = useState<string | null>(null);
@@ -96,19 +105,28 @@ export function JobPortal({
   const payoutDone = Boolean(job.paypal_payout_item_id);
   const bothAgreed = Boolean(job.client_agreed_at && job.maya_agreed_at);
   const needsClarification = job.agreement_status === "needs_clarification";
+  const showMoney = moneyVisible(job);
   const canAgree =
-    amountsOk && Boolean(job.work_summary) && !needsClarification && job.agreement_status !== "needs_clarification";
+    showMoney &&
+    job.agreement_status === "ready" &&
+    job.agreement_version > 0 &&
+    amountsOk &&
+    Boolean(job.work_summary) &&
+    !locked;
+  const storedClient = showMoney ? job.client_amount : "";
+  const storedMaya = showMoney ? job.maya_amount : "";
+  const storedStudio = showMoney ? job.studio_amount : "";
   const formDirty =
     summary !== (job.work_summary ?? "") ||
-    clientAmount !== job.client_amount ||
-    mayaAmount !== job.maya_amount ||
-    studioAmount !== job.studio_amount;
+    clientAmount !== storedClient ||
+    mayaAmount !== storedMaya ||
+    studioAmount !== storedStudio;
 
   function syncForm(next: JobPayload) {
     setSummary(next.work_summary ?? "");
-    setClientAmount(next.client_amount);
-    setMayaAmount(next.maya_amount);
-    setStudioAmount(next.studio_amount);
+    setClientAmount(blankUnlessVisible(next, next.client_amount));
+    setMayaAmount(blankUnlessVisible(next, next.maya_amount));
+    setStudioAmount(blankUnlessVisible(next, next.studio_amount));
   }
 
   async function refresh(): Promise<{ job: JobPayload; events: PaypalEventPayload[] }> {
@@ -118,6 +136,7 @@ export function JobPortal({
       events?: PaypalEventPayload[];
       messages?: JobMessagePayload[];
       clarificationQuestions?: string[];
+      aiRun?: AiRunPayload | null;
       error?: string;
     };
     if (!res.ok || !payload.job) {
@@ -127,6 +146,7 @@ export function JobPortal({
     setEvents(payload.events ?? []);
     if (payload.messages) setThread(toThread(payload.messages));
     setClarificationQuestions(payload.clarificationQuestions ?? []);
+    setAiRun(payload.aiRun ?? null);
     syncForm(payload.job);
     return { job: payload.job, events: payload.events ?? [] };
   }
@@ -151,17 +171,8 @@ export function JobPortal({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(errorMessage(payload, "could not save note"));
-      const saved = payload.message as JobMessagePayload;
-      setThread((current) => [
-        ...current,
-        {
-          id: saved.id,
-          party: saved.party,
-          name: saved.author_name,
-          body: saved.body,
-        },
-      ]);
     }
+    await refresh();
   }
 
   async function createJob() {
@@ -193,17 +204,8 @@ export function JobPortal({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(errorMessage(payload, "could not save note"));
-      const saved = payload.message as JobMessagePayload;
-      setThread((current) => [
-        ...current,
-        {
-          id: saved.id,
-          party: saved.party,
-          name: saved.author_name,
-          body: saved.body,
-        },
-      ]);
       setNote("");
+      await refresh();
     });
   }
 
@@ -236,6 +238,7 @@ export function JobPortal({
       } else {
         setClarificationQuestions([]);
       }
+      if (payload.aiRun) setAiRun(payload.aiRun as AiRunPayload);
     });
   }
 
@@ -310,52 +313,46 @@ export function JobPortal({
     return () => window.clearInterval(timer);
   }, [status, job.id]);
 
+  const orderUrl = job.paypal_order_id
+    ? `https://www.sandbox.paypal.com/checkoutnow?token=${encodeURIComponent(job.paypal_order_id)}`
+    : null;
   const steps = useMemo(
     () => [
       {
-        key: "draft",
-        title: "Agreement drafted",
-        copy: job.work_summary ?? "Waiting for a draft from the activity thread.",
-        state: job.work_summary && amountsOk ? "done" : "pending",
+        key: "agreed",
+        title: "Agreed",
+        copy: bothAgreed
+          ? `Maya ${formatWhen(job.maya_agreed_at)}. Client ${formatWhen(job.client_agreed_at)}.`
+          : "Maya and the client both agree before PayPal opens.",
+        state: bothAgreed ? "done" : job.maya_agreed_at || job.client_agreed_at ? "waiting" : "pending",
       },
       {
-        key: "maya",
-        title: "Maya agreed",
-        copy: job.maya_agreed_at
-          ? formatWhen(job.maya_agreed_at)
-          : "Maya has not agreed yet.",
-        state: job.maya_agreed_at ? "done" : "pending",
+        key: "order",
+        title: "Order",
+        copy: job.paypal_order_id
+          ? `Order ${job.paypal_order_id}`
+          : "No PayPal order yet.",
+        href: orderUrl,
+        state: job.paypal_order_id ? "done" : bothAgreed ? "waiting" : "pending",
       },
       {
-        key: "client",
-        title: "Client agreed",
-        copy: job.client_agreed_at
-          ? formatWhen(job.client_agreed_at)
-          : "Client has not agreed yet.",
-        state: job.client_agreed_at ? "done" : "pending",
-      },
-      {
-        key: "capture",
-        title: captureDone
-          ? `Client paid ${formatUsd(job.client_amount)}`
-          : `Client payment pending ${formatUsd(job.client_amount)}`,
-        copy: captureDone
+        key: "captured",
+        title: "Captured",
+        copy: job.paypal_capture_id
           ? `PAYMENT.CAPTURE.COMPLETED · ${job.paypal_capture_id}`
-          : "Payout starts after client payment is confirmed.",
-        state: captureDone ? "done" : bothAgreed ? "waiting" : "pending",
+          : "Capture is recorded only with a PayPal capture id.",
+        state: captureDone ? "done" : job.paypal_order_id ? "waiting" : "pending",
       },
       {
         key: "payout",
-        title: payoutDone
-          ? `Maya paid ${formatUsd(job.maya_amount)}`
-          : `Maya payout pending ${formatUsd(job.maya_amount)}`,
-        copy: payoutDone
-          ? `PAYMENT.PAYOUTS-ITEM.SUCCEEDED · ${job.paypal_payout_item_id ?? "stored"}. Studio keeps ${formatUsd(job.studio_amount)}.`
-          : "Maya is paid only after the capture webhook.",
+        title: "Payout sent",
+        copy: job.paypal_payout_item_id
+          ? `PAYMENT.PAYOUTS-ITEM.SUCCEEDED · ${job.paypal_payout_item_id}`
+          : "Maya's payout is recorded only with a payout item id.",
         state: payoutDone ? "done" : captureDone ? "waiting" : "pending",
       },
     ],
-    [amountsOk, bothAgreed, captureDone, job, payoutDone],
+    [bothAgreed, captureDone, job, orderUrl, payoutDone],
   );
 
   return (
@@ -380,8 +377,21 @@ export function JobPortal({
       <main className="shell">
         <article className="brief">
           <p className="eyebrow">{job.id}</p>
+          <h1 className="headline">AI cannot move money it can't cite.</h1>
+          <p className="impact">
+            Remote&apos;s 2025 survey of 3,300 freelancers found that 85% are paid late at least some of
+            the time.{" "}
+            <a
+              href="https://remote.com/blog/contractor-management/reversing-late-payment-culture"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Source
+            </a>
+            . Hire is the page for a small studio that subcontracts the work to Maya.
+          </p>
           {locked ? (
-            <h1>{summary || "Job brief"}</h1>
+            <h2 className="job-title">{summary || "Job brief"}</h2>
           ) : (
             <label className="title-field">
               <span>Work summary</span>
@@ -392,7 +402,11 @@ export function JobPortal({
               />
             </label>
           )}
-          <p className="lede">{splitCopy(job.client_amount, job.maya_amount, job.studio_amount)}</p>
+          <p className="lede">
+            {showMoney
+              ? splitCopy(job.client_amount, job.maya_amount, job.studio_amount)
+              : "Client, Maya, and studio amounts appear after a draft the server can cite."}
+          </p>
           {error ? <p className="banner">{error}</p> : null}
           {needsClarification && clarificationQuestions.length > 0 ? (
             <div className="clarify-card" role="status">
@@ -434,6 +448,7 @@ export function JobPortal({
                     inputMode="decimal"
                     disabled={busy !== "idle"}
                     onChange={(event) => setClientAmount(event.target.value)}
+                    placeholder="After a cited draft"
                     value={clientAmount}
                   />
                 </label>
@@ -443,6 +458,7 @@ export function JobPortal({
                     inputMode="decimal"
                     disabled={busy !== "idle"}
                     onChange={(event) => setMayaAmount(event.target.value)}
+                    placeholder="After a cited draft"
                     value={mayaAmount}
                   />
                 </label>
@@ -452,11 +468,13 @@ export function JobPortal({
                     inputMode="decimal"
                     disabled={busy !== "idle"}
                     onChange={(event) => setStudioAmount(event.target.value)}
+                    placeholder="After a cited draft"
                     value={studioAmount}
                   />
                 </label>
               </div>
-              {!amountsAddUp(clientAmount, mayaAmount, studioAmount) ? (
+              {(clientAmount || mayaAmount || studioAmount) &&
+              !amountsAddUp(clientAmount, mayaAmount, studioAmount) ? (
                 <p className="banner">
                   Client, Maya, and studio amounts must each be greater than zero, and the client
                   amount must equal Maya plus studio.
@@ -477,31 +495,31 @@ export function JobPortal({
                         </dd>
                       </div>
                     ) : null}
-                    {clientAmount !== job.client_amount ? (
+                    {clientAmount !== storedClient ? (
                       <div>
                         <dt>Client pays</dt>
                         <dd>
-                          <span className="diff-old">{formatUsd(job.client_amount)}</span>
+                          <span className="diff-old">{showMoney ? formatUsd(job.client_amount) : "—"}</span>
                           <span className="diff-arrow">→</span>
                           <span className="diff-new">{formatUsd(clientAmount)}</span>
                         </dd>
                       </div>
                     ) : null}
-                    {mayaAmount !== job.maya_amount ? (
+                    {mayaAmount !== storedMaya ? (
                       <div>
                         <dt>Maya receives</dt>
                         <dd>
-                          <span className="diff-old">{formatUsd(job.maya_amount)}</span>
+                          <span className="diff-old">{showMoney ? formatUsd(job.maya_amount) : "—"}</span>
                           <span className="diff-arrow">→</span>
                           <span className="diff-new">{formatUsd(mayaAmount)}</span>
                         </dd>
                       </div>
                     ) : null}
-                    {studioAmount !== job.studio_amount ? (
+                    {studioAmount !== storedStudio ? (
                       <div>
                         <dt>Studio keeps</dt>
                         <dd>
-                          <span className="diff-old">{formatUsd(job.studio_amount)}</span>
+                          <span className="diff-old">{showMoney ? formatUsd(job.studio_amount) : "—"}</span>
                           <span className="diff-arrow">→</span>
                           <span className="diff-new">{formatUsd(studioAmount)}</span>
                         </dd>
@@ -618,7 +636,13 @@ export function JobPortal({
             </div>
             <div className="thread">
               {thread.length === 0 ? (
-                <p className="empty">No notes yet. Add a free-form note, or load an example.</p>
+                <div className="empty-state">
+                  <p>No notes yet.</p>
+                  <p>
+                    Add what the client pays, what Maya receives, and what the studio keeps. The split
+                    stays blank until a draft can cite those notes.
+                  </p>
+                </div>
               ) : (
                 thread.map((message) => (
                   <article
@@ -693,18 +717,18 @@ export function JobPortal({
         <aside className="rail">
           <section className="card">
             <h2>Split</h2>
-            <div className="split">
+              <div className="split">
               <div className="split-row">
                 <span className="label">Client pays</span>
-                <span className="amount">{formatUsd(job.client_amount)}</span>
+                <span className="amount">{showMoney ? formatUsd(job.client_amount) : "—"}</span>
               </div>
               <div className="split-row">
                 <span className="label">Maya receives</span>
-                <span className="amount">{formatUsd(job.maya_amount)}</span>
+                <span className="amount">{showMoney ? formatUsd(job.maya_amount) : "—"}</span>
               </div>
               <div className="split-row studio">
                 <span className="label">Studio keeps</span>
-                <span className="amount">{formatUsd(job.studio_amount)}</span>
+                <span className="amount">{showMoney ? formatUsd(job.studio_amount) : "—"}</span>
               </div>
             </div>
           </section>
@@ -720,6 +744,11 @@ export function JobPortal({
                   <div>
                     <div className="step-title">{step.title}</div>
                     <div className="step-copy">{step.copy}</div>
+                    {"href" in step && step.href ? (
+                      <a className="paypal-link" href={step.href} rel="noreferrer" target="_blank">
+                        Open sandbox order
+                      </a>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -729,17 +758,16 @@ export function JobPortal({
           <section className="card">
             <h2>PayPal</h2>
             <p className="lede">
-              The order is created with PayPal Agent Toolkit{" "}
-              <code>create_order</code> from the stored {formatUsd(job.client_amount)}. Capture uses{" "}
-              <code>pay_order</code>. Maya is paid {formatUsd(job.maya_amount)} on Payouts v1 only after
-              the capture webhook. The model does not pick the PayPal amount.
+              The order is created with PayPal Agent Toolkit <code>create_order</code> from the stored
+              client amount. Capture uses <code>pay_order</code>. Maya is paid the stored share on
+              Payouts v1 only after the capture webhook. The model does not pick the PayPal amount.
             </p>
             {captureDone ? (
               <p className="settled">
-                Client paid {formatUsd(job.client_amount)}.
+                Client paid {formatUsd(job.client_amount)}. Capture {job.paypal_capture_id}.
                 {payoutDone
-                  ? ` Maya received ${formatUsd(job.maya_amount)}. Studio keeps ${formatUsd(job.studio_amount)}.`
-                  : ` Waiting on Maya's ${formatUsd(job.maya_amount)}.`}
+                  ? ` Maya received ${formatUsd(job.maya_amount)}. Payout item ${job.paypal_payout_item_id}. Studio keeps ${formatUsd(job.studio_amount)}.`
+                  : " Waiting on Maya's payout item id."}
               </p>
             ) : (
               <div className="actions pay-actions">
@@ -749,11 +777,15 @@ export function JobPortal({
                   onClick={() => void createOrder()}
                   type="button"
                 >
-                  {busy === "order" ? "Opening PayPal…" : `Pay ${formatUsd(job.client_amount)} on PayPal`}
+                  {busy === "order"
+                    ? "Opening PayPal…"
+                    : showMoney
+                      ? `Pay ${formatUsd(job.client_amount)} on PayPal`
+                      : "Pay on PayPal"}
                 </button>
                 {approveUrl ? (
                   <a className="paypal-link" href={approveUrl} rel="noreferrer" target="_blank">
-                    Open PayPal to approve {formatUsd(job.client_amount)}
+                    Open PayPal to approve {showMoney ? formatUsd(job.client_amount) : "the stored amount"}
                   </a>
                 ) : null}
                 {job.paypal_order_id ? (
@@ -782,6 +814,43 @@ export function JobPortal({
                 Refresh
               </button>
             </div>
+          </section>
+
+          <section className="card">
+            <h2>Draft run</h2>
+            {aiRun ? (
+              <>
+                <p className="lede">
+                  {aiRun.validation === "parser_fallback"
+                    ? "Parsed from notes, not a model."
+                    : aiRun.validation === "citation_rejected"
+                      ? `Rejected by the server. ${aiRun.model} cited something that is not in the notes.`
+                      : `Drafted by ${aiRun.model}.`}
+                </p>
+                <dl className="records">
+                  <div>
+                    <dt>Model</dt>
+                    <dd>{aiRun.model}</dd>
+                  </div>
+                  <div>
+                    <dt>Latency</dt>
+                    <dd>{aiRun.latency_ms} ms</dd>
+                  </div>
+                  <div>
+                    <dt>Tokens</dt>
+                    <dd>
+                      {aiRun.input_tokens ?? "—"} in / {aiRun.output_tokens ?? "—"} out
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Validation</dt>
+                    <dd>{aiRun.validation}</dd>
+                  </div>
+                </dl>
+              </>
+            ) : (
+              <p className="lede">No draft run yet.</p>
+            )}
           </section>
 
           <section className="card">

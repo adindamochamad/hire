@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { getJob, listJobMessages, pool } from "@/lib/db";
-import { serializeEvent, serializeJob, serializeMessage } from "@/lib/job";
+import { getJob, latestAiRun, listJobMessages, pool } from "@/lib/db";
+import { serializeAiRun, serializeEvent, serializeJob, serializeMessage } from "@/lib/job";
 import { JobPortal } from "./job-portal";
 
 export const dynamic = "force-dynamic";
@@ -40,12 +40,15 @@ export default async function JobPage({
     }
   }
 
+  const aiRun = await latestAiRun(id);
+
   return (
     <JobPortal
       initialJob={serializeJob(job)}
       initialEvents={events.rows.map(serializeEvent)}
       initialMessages={messages.map(serializeMessage)}
       initialClarificationQuestions={clarificationQuestions}
+      initialAiRun={aiRun ? serializeAiRun(aiRun) : null}
     />
   );
 }

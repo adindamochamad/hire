@@ -7,6 +7,9 @@ export function orderEligibility(
   if (job.agreement_status === "needs_clarification") {
     return { ok: false, error: "ambiguous agreement cannot create an order" };
   }
+  if (job.agreement_status !== "ready" || Number(job.agreement_version ?? 0) < 1) {
+    return { ok: false, error: "agreement is not ready" };
+  }
   if (!moneyAddsUp(job)) {
     return { ok: false, error: "stored amounts do not add up" };
   }
