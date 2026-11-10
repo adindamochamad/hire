@@ -44,7 +44,7 @@ flowchart LR
   payout --> item[PAYOUTS-ITEM.SUCCEEDED]
 ```
 
-Demo video: add the public YouTube URL here before submission.
+Demo video: [Hire on YouTube](https://youtu.be/cRNUUstOpYk) (2:47).
 
 Screenshots: the job page before a draft (amounts blank) and after capture (PayPal ids on the timeline).
 
