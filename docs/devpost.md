@@ -26,6 +26,14 @@ The model drafts the agreement from the notes. It cannot move money it cannot ci
 
 If the model API is unavailable, a parser reads the notes and the page says it was parsed from notes, not a model. A new note that changes an amount after agreement locks payment until both people agree again.
 
+## Live proof
+
+Same Render SHA as `GET /api/health`: `d2e5f9b1818050807bd7483d0b94415991e7f3d2`.
+
+The full path is one job: [hire-b6678486-44d2-4b3b-a84f-c46fbad12be1](https://hire-brjt.onrender.com/jobs/hire-b6678486-44d2-4b3b-a84f-c46fbad12be1). Claude (`claude-sonnet-5-5`) drafted $1,200 / $800 / $400 with quotes from the notes (validation `pass`). After Maya and the client agreed, the sandbox order was `3AR43283AW825772L`. Capture `7CN781661U7159137`. Maya's payout item `D37YDXNDFJAPA`.
+
+A new job does not store those amounts until a cited draft is ready. Ambiguous notes stay unresolved: [hire-1ba7264c-…](https://hire-brjt.onrender.com/jobs/hire-1ba7264c-b5a9-4952-8c85-2ead93bc1790) (`$1,200` vs `$1,000`, `needs_clarification`). A later note that changes an amount after agreement is drift: [hire-e2288b05-…](https://hire-brjt.onrender.com/jobs/hire-e2288b05-e861-4787-ac9e-a458817302f1).
+
 ## Built with
 
 - PayPal Agent Toolkit: `create_order`, `pay_order`

@@ -10,7 +10,16 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 Live (Render): [https://hire-brjt.onrender.com](https://hire-brjt.onrender.com)
 
-The home page opens a **new job** (unique PayPal request ids) so each reviewer can start clean.
+Health SHA: [`d2e5f9b1818050807bd7483d0b94415991e7f3d2`](https://hire-brjt.onrender.com/api/health). The home page opens a **new job** (unique PayPal request ids) so each reviewer can start clean. A new row stores no $1,200 / $800 / $400 until a cited draft is ready.
+
+### One job, draft through payout
+
+[hire-b6678486-44d2-4b3b-a84f-c46fbad12be1](https://hire-brjt.onrender.com/jobs/hire-b6678486-44d2-4b3b-a84f-c46fbad12be1) — drafted by `claude-sonnet-5-5` (validation `pass`, 7.4s). Split $1,200 / $800 / $400, each quoted from the notes. Order `3AR43283AW825772L`. Capture `7CN781661U7159137` (`PAYMENT.CAPTURE.COMPLETED`). Maya payout item `D37YDXNDFJAPA` (`PAYMENT.PAYOUTS-ITEM.SUCCEEDED`).
+
+### Where the model refuses
+
+- Ambiguous notes ($1,200 studio quote vs $1,000 client budget): [hire-1ba7264c-…](https://hire-brjt.onrender.com/jobs/hire-1ba7264c-b5a9-4952-8c85-2ead93bc1790) — `needs_clarification`, amounts stay blank, PayPal stays closed.
+- Agreement drift (after both agreed, a note asked for $1,100): [hire-e2288b05-…](https://hire-brjt.onrender.com/jobs/hire-e2288b05-e861-4787-ac9e-a458817302f1) — both agreements cleared, amounts blanked, PayPal stays closed.
 
 ## What it does
 
