@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  agreementDrifted,
   agreementLocked,
   jobStatus,
   moneyVisible,
@@ -64,6 +65,26 @@ function formatWhen(value: string | null): string {
   });
 }
 
+function draftRunSummary(aiRun: AiRunPayload, job: JobPayload, drifted: boolean): string {
+  if (drifted) return "Superseded. A later note changed an amount, so this draft no longer counts.";
+  if (aiRun.validation === "parser_fallback") return "Parsed from notes, not a model.";
+  if (aiRun.validation === "citation_rejected") {
+    return `Rejected by the server. ${aiRun.model} cited something that is not in the notes. No amounts stored.`;
+  }
+  if (job.agreement_status === "needs_clarification") {
+    return `${aiRun.model} could not cite every dollar, so it asked a question. No amounts stored.`;
+  }
+  return `Drafted by ${aiRun.model}. Every dollar matched a note.`;
+}
+
+function validationLabel(aiRun: AiRunPayload, job: JobPayload, drifted: boolean): string {
+  if (drifted) return "Superseded";
+  if (aiRun.validation === "parser_fallback") return "Parser fallback";
+  if (aiRun.validation === "citation_rejected") return "Citation rejected";
+  if (job.agreement_status === "needs_clarification") return "Needs clarification";
+  return "Citations verified";
+}
+
 function blankUnlessVisible(job: JobPayload, amount: string | null): string {
   return moneyVisible(job) && amount ? amount : "";
 }
@@ -96,6 +117,7 @@ export function JobPortal({
   );
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [pendingSave, setPendingSave] = useState(false);
+  const [draftSeconds, setDraftSeconds] = useState(0);
   const messageRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const status = jobStatus(job, events);
@@ -105,6 +127,7 @@ export function JobPortal({
   const payoutDone = Boolean(job.paypal_payout_item_id);
   const bothAgreed = Boolean(job.client_agreed_at && job.maya_agreed_at);
   const needsClarification = job.agreement_status === "needs_clarification";
+  const drifted = agreementDrifted(job, clarificationQuestions);
   const showMoney = moneyVisible(job);
   const canAgree =
     showMoney &&
@@ -306,6 +329,16 @@ export function JobPortal({
   }
 
   useEffect(() => {
+    if (busy !== "draft") return;
+    setDraftSeconds(0);
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      setDraftSeconds(Math.floor((Date.now() - started) / 1000));
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [busy]);
+
+  useEffect(() => {
     if (status !== "awaiting_payment" && status !== "paying_maya") return;
     const timer = window.setInterval(() => {
       void refresh().catch(() => undefined);
@@ -410,7 +443,7 @@ export function JobPortal({
           {error ? <p className="banner">{error}</p> : null}
           {needsClarification && clarificationQuestions.length > 0 ? (
             <div className="clarify-card" role="status">
-              <h2>Needs clarification</h2>
+              <h2>{drifted ? "Needs clarification: agreement drift" : "Needs clarification"}</h2>
               <ul>
                 {clarificationQuestions.map((question) => (
                   <li key={question}>{question}</li>
@@ -418,7 +451,7 @@ export function JobPortal({
               </ul>
             </div>
           ) : null}
-          <AgreementEvidencePanel job={job} onViewSource={viewSource} />
+          <AgreementEvidencePanel drifted={drifted} job={job} onViewSource={viewSource} />
           {locked ? (
             <p className="banner">
               This job already has a PayPal order. Start a new job to negotiate a different agreement.
@@ -715,9 +748,19 @@ export function JobPortal({
                     onClick={() => void draftFromActivity()}
                     type="button"
                   >
-                    {busy === "draft" ? "Drafting…" : "Draft agreement from notes"}
+                    {busy === "draft" ? `Drafting… ${draftSeconds}s` : "Draft agreement from notes"}
                   </button>
                 </div>
+                {busy === "draft" ? (
+                  <div className="draft-progress" role="status" aria-live="polite">
+                    <span className="draft-spinner" aria-hidden />
+                    <p>
+                      Claude is reading {thread.length} {thread.length === 1 ? "note" : "notes"}. The
+                      server then checks that every dollar is an exact quote. This usually takes 6–8
+                      seconds.
+                    </p>
+                  </div>
+                ) : null}
               </>
             )}
           </section>
@@ -783,6 +826,7 @@ export function JobPortal({
                 <button
                   className="primary"
                   disabled={busy !== "idle" || !bothAgreed || needsClarification}
+                  title={needsClarification ? "PayPal stays locked until a cited draft is agreed." : undefined}
                   onClick={() => void createOrder()}
                   type="button"
                 >
@@ -829,13 +873,7 @@ export function JobPortal({
             <h2>Draft run</h2>
             {aiRun ? (
               <>
-                <p className="lede">
-                  {aiRun.validation === "parser_fallback"
-                    ? "Parsed from notes, not a model."
-                    : aiRun.validation === "citation_rejected"
-                      ? `Rejected by the server. ${aiRun.model} cited something that is not in the notes.`
-                      : `Drafted by ${aiRun.model}.`}
-                </p>
+                <p className="lede">{draftRunSummary(aiRun, job, drifted)}</p>
                 <dl className="records">
                   <div>
                     <dt>Model</dt>
@@ -853,7 +891,7 @@ export function JobPortal({
                   </div>
                   <div>
                     <dt>Validation</dt>
-                    <dd>{aiRun.validation}</dd>
+                    <dd>{validationLabel(aiRun, job, drifted)}</dd>
                   </div>
                 </dl>
               </>

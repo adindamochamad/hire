@@ -47,6 +47,7 @@ export type PaypalEventPayload = {
 
 export type JobStatus =
   | "drafting"
+  | "needs_clarification"
   | "awaiting_agreement"
   | "awaiting_payment"
   | "paying_maya"
@@ -104,6 +105,13 @@ export function serializeAiRun(run: {
   };
 }
 
+export const DRIFT_QUESTION =
+  "Agreement drift: a new note changed an amount. Draft again. Both parties must agree before PayPal opens.";
+
+export function agreementDrifted(job: JobPayload, questions: string[]): boolean {
+  return job.agreement_status === "needs_clarification" && questions.includes(DRIFT_QUESTION);
+}
+
 export function moneyVisible(job: JobPayload): boolean {
   return job.agreement_status === "ready" || Boolean(job.paypal_order_id);
 }
@@ -149,6 +157,7 @@ export function hasPayoutEvent(events: PaypalEventPayload[]): boolean {
 export function jobStatus(job: JobPayload, _events?: PaypalEventPayload[]): JobStatus {
   if (job.paypal_payout_item_id) return "complete";
   if (job.paypal_capture_id) return "paying_maya";
+  if (job.agreement_status === "needs_clarification") return "needs_clarification";
   if (job.agreement_status !== "ready") return "drafting";
   const amountsOk = amountsAddUp(job.client_amount, job.maya_amount, job.studio_amount);
   if (job.client_agreed_at && job.maya_agreed_at && amountsOk) return "awaiting_payment";
@@ -160,6 +169,8 @@ export function statusLabel(status: JobStatus): string {
   switch (status) {
     case "drafting":
       return "Drafting";
+    case "needs_clarification":
+      return "Needs clarification";
     case "awaiting_agreement":
       return "Awaiting agreement";
     case "awaiting_payment":

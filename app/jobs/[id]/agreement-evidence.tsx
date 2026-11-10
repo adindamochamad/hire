@@ -4,11 +4,18 @@ import { usdLabel } from "@/lib/money";
 
 type Props = {
   job: JobPayload;
+  drifted: boolean;
   onViewSource: (messageId: string) => void;
 };
 
-function sourceLabel(field: FieldEvidence | undefined, needsClarify: boolean): string {
+// A money quote that no longer backs a stored amount: replaced by a later note
+// (drift) or cited by a draft that still needs an answer.
+type Stale = "superseded" | "unresolved" | null;
+
+function sourceLabel(field: FieldEvidence | undefined, needsClarify: boolean, stale: Stale): string {
   if (!field) return needsClarify ? "Needs clarification" : "—";
+  if (stale === "superseded") return "Superseded";
+  if (stale === "unresolved") return "Unresolved";
   if (field.kind === "quoted") return "Quoted";
   return "Calculated";
 }
@@ -18,17 +25,19 @@ function FieldRow({
   value,
   field,
   needsClarify,
+  stale = null,
   onViewSource,
 }: {
   label: string;
   value: string;
   field: FieldEvidence | undefined;
   needsClarify: boolean;
+  stale?: Stale;
   onViewSource: (messageId: string) => void;
 }) {
-  const badge = sourceLabel(field, needsClarify);
+  const badge = sourceLabel(field, needsClarify, stale);
   return (
-    <div className="evidence-row">
+    <div className={`evidence-row${field && stale ? ` ${stale}` : ""}`}>
       <div className="evidence-head">
         <span className="evidence-label">{label}</span>
         <span className={`evidence-badge ${badge.replace(/\s+/g, "-").toLowerCase()}`}>{badge}</span>
@@ -61,6 +70,12 @@ function FieldRow({
           </button>
         </div>
       ) : null}
+      {field && stale === "superseded" ? (
+        <p className="evidence-hint">A later note changed this amount. Draft again before anyone agrees.</p>
+      ) : null}
+      {field && stale === "unresolved" ? (
+        <p className="evidence-hint">Cited, but not stored until the question above is answered.</p>
+      ) : null}
       {!field && needsClarify ? (
         <p className="evidence-hint">Answer in the thread, then draft again.</p>
       ) : null}
@@ -68,17 +83,20 @@ function FieldRow({
   );
 }
 
-export function AgreementEvidencePanel({ job, onViewSource }: Props) {
+export function AgreementEvidencePanel({ job, drifted, onViewSource }: Props) {
   const evidence: AgreementEvidence = job.agreement_evidence ?? {};
   const needsClarify = job.agreement_status === "needs_clarification";
   const showMoney = moneyVisible(job);
+  const moneyStale: Stale = showMoney ? null : drifted ? "superseded" : "unresolved";
   if (!job.work_summary && !needsClarify && !job.agreement_evidence) return null;
 
   return (
     <section className="evidence-card" aria-label="Agreement sources">
       <h2>Why these numbers?</h2>
       <p className="lede">
-        Sources explain the draft. They do not mean both parties have agreed yet.
+        {drifted
+          ? "A note changed an amount after this draft. The old quotes below no longer count."
+          : "Sources explain the draft. They do not mean both parties have agreed yet."}
       </p>
       <FieldRow
         label="Work"
@@ -92,6 +110,7 @@ export function AgreementEvidencePanel({ job, onViewSource }: Props) {
         value={usdLabel(showMoney ? job.client_amount : null)}
         field={evidence.clientAmount}
         needsClarify={needsClarify && !evidence.clientAmount}
+        stale={moneyStale}
         onViewSource={onViewSource}
       />
       <FieldRow
@@ -99,6 +118,7 @@ export function AgreementEvidencePanel({ job, onViewSource }: Props) {
         value={usdLabel(showMoney ? job.maya_amount : null)}
         field={evidence.mayaAmount}
         needsClarify={needsClarify && !evidence.mayaAmount}
+        stale={moneyStale}
         onViewSource={onViewSource}
       />
       <FieldRow
@@ -106,6 +126,7 @@ export function AgreementEvidencePanel({ job, onViewSource }: Props) {
         value={usdLabel(showMoney ? job.studio_amount : null)}
         field={evidence.studioAmount}
         needsClarify={needsClarify && !evidence.studioAmount}
+        stale={moneyStale}
         onViewSource={onViewSource}
       />
     </section>

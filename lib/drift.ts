@@ -1,9 +1,9 @@
 import type { JobRow } from "./db";
 import { pool } from "./db";
+import { DRIFT_QUESTION } from "./job";
 import { asMoney } from "./money";
 
-export const DRIFT_QUESTION =
-  "Agreement drift: a new note changed an amount. Draft again. Both parties must agree before PayPal opens.";
+export { DRIFT_QUESTION };
 
 export function amountsMentioned(text: string): string[] {
   const found: string[] = [];
